@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { EssealTable, type GridColDef, type GridAction, type TableState } from './EssealTable';
+import { EssealDataTable, type GridColDef, type GridAction, type TableState } from './EssealDataTable';
 
 // --- Types & Constants ---
 type Density = 'compact' | 'standard' | 'comfortable';
@@ -199,7 +199,7 @@ export default function App() {
 
         {/* --- Table --- */}
         <div style={{ height: '600px', background: 'white', borderRadius: '8px', overflow: 'hidden', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}>
-          <EssealTable
+          <EssealDataTable
             rows={rows}
             columns={columns}
             loading={loading}

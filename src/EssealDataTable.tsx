@@ -1,305 +1,8 @@
 /* eslint-disable */
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
-
-// --- CSS Styles ---
-const gridStyles = `
-/* DataGrid Component - EssealTable Theme */
-:root {
-  --dg-primary: #0ea5e9;
-  --dg-primary-hover: #0284c7;
-  --dg-primary-light: #e0f2fe;
-  --dg-selection-bg: #f0f9ff;
-
-  --dg-surface: #ffffff;
-  --dg-surface-alt: #f8fafc;
-  --dg-surface-hover: #f1f5f9;
-
-  --dg-border: #e2e8f0;
-  --dg-border-light: #f1f5f9;
-
-  --dg-text-primary: #0f172a;
-  --dg-text-secondary: #64748b;
-  --dg-text-muted: #94a3b8;
-
-  --dg-shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-  --dg-shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-}
-
-.dg-container {
-  background: var(--dg-surface);
-  border: 1px solid var(--dg-border);
-  border-radius: 8px;
-  overflow: hidden;
-  box-shadow: var(--dg-shadow-sm);
-  font-family: "Inter", sans-serif;
-  display: flex;
-  flex-direction: column;
-  position: relative;
-}
-
-/* Toolbar */
-.dg-toolbar {
-  padding: 8px 12px;
-  border-bottom: 1px solid var(--dg-border);
-  display: flex;
-  justify-content: flex-end;
-  background: var(--dg-surface);
-}
-
-.dg-toolbar-btn {
-  padding: 6px 12px;
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--dg-text-secondary);
-  border: 1px solid var(--dg-border);
-  border-radius: 4px;
-  background: white;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  transition: all 0.2s;
-}
-.dg-toolbar-btn:hover { background: var(--dg-surface-hover); color: var(--dg-text-primary); }
-
-/* Menus (Column Picker & Pin Menu) */
-.dg-menu {
-  position: absolute;
-  background: white;
-  border: 1px solid var(--dg-border);
-  box-shadow: var(--dg-shadow-md);
-  border-radius: 6px;
-  z-index: 50;
-  min-width: 140px;
-  padding: 4px;
-}
-.dg-column-menu { top: 45px; right: 12px; width: 200px; max-height: 300px; overflow-y: auto; }
-.dg-pin-menu { top: 100%; left: 0; margin-top: 4px; }
-
-.dg-menu-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 8px;
-  font-size: 13px;
-  color: var(--dg-text-primary);
-  cursor: pointer;
-  border-radius: 4px;
-}
-.dg-menu-item:hover { background: var(--dg-surface-hover); color: var(--dg-primary); }
-.dg-menu-item.active { background: var(--dg-primary-light); color: var(--dg-primary); }
-
-/* Viewport */
-.dg-viewport::-webkit-scrollbar { width: 10px; height: 10px; }
-.dg-viewport::-webkit-scrollbar-track { background: transparent; }
-.dg-viewport::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
-  border-radius: 5px;
-  border: 2px solid var(--dg-surface);
-}
-.dg-viewport::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
-
-/* Header */
-.dg-header-row {
-  background: var(--dg-surface-alt);
-  border-bottom: 1px solid var(--dg-border);
-  font-weight: 600;
-  color: var(--dg-text-secondary);
-  font-size: 13px;
-  text-transform: uppercase;
-  letter-spacing: 0.025em;
-  display: grid;
-  position: sticky;
-  top: 0;
-  z-index: 10;
-}
-
-.dg-header-cell {
-  padding: 8px 12px;
-  border-right: 1px solid var(--dg-border-light);
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 4px;
-  position: relative;
-  background: var(--dg-surface-alt);
-  transition: background 0.2s;
-}
-.dg-header-cell:hover { background: var(--dg-surface-hover); }
-
-.dg-header-main {
-  display: flex;
-  align-items: center;
-  justify-content: space-between; /* Space for pin icon */
-  gap: 6px;
-  user-select: none;
-  min-height: 20px;
-}
-
-.dg-header-title {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  cursor: pointer;
-  flex-grow: 1;
-}
-
-.dg-pin-icon {
-  opacity: 0; 
-  cursor: pointer; 
-  padding: 2px;
-  border-radius: 4px;
-  color: var(--dg-text-muted);
-}
-.dg-header-cell:hover .dg-pin-icon, .dg-pin-icon.pinned { opacity: 1; }
-.dg-pin-icon:hover { background: var(--dg-border); color: var(--dg-text-primary); }
-.dg-pin-icon.pinned { color: var(--dg-primary); }
-
-
-/* Column Filter Input */
-.dg-column-filter {
-  width: 100%;
-  box-sizing: border-box; 
-  min-width: 0;
-  padding: 4px 6px;
-  border: 1px solid var(--dg-border);
-  border-radius: 4px;
-  font-size: 11px;
-  color: var(--dg-text-primary);
-  margin-top: 2px;
-  outline: none;
-}
-.dg-column-filter:focus { border-color: var(--dg-primary); }
-
-/* Rows */
-.dg-body {
-  display: grid;
-}
-.dg-row { display: contents; }
-.dg-row:hover .dg-cell { background: var(--dg-surface-hover); }
-.dg-row.selected .dg-cell { background: var(--dg-selection-bg); }
-
-.dg-cell {
-  padding: 0 12px;
-  font-size: 14px;
-  color: var(--dg-text-primary);
-  border-bottom: 1px solid var(--dg-border-light);
-  border-right: 1px solid var(--dg-border-light);
-  background: var(--dg-surface);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  display: flex;
-  align-items: center;
-}
-
-/* Group Row */
-.dg-group-row {
-  background: var(--dg-primary-light);
-  border-bottom: 1px solid var(--dg-border);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  font-size: 14px;
-  color: var(--dg-text-primary);
-  font-weight: 500;
-}
-
-/* Resizer */
-.dg-resizer {
-  position: absolute;
-  right: 0;
-  top: 0;
-  bottom: 0;
-  width: 4px;
-  cursor: col-resize;
-  z-index: 10;
-}
-.dg-resizer:hover, .dg-resizer:active { background: var(--dg-primary); }
-
-/* Overlays */
-.dg-overlay {
-  position: absolute;
-  inset: 0;
-  background: rgba(255, 255, 255, 0.6);
-  backdrop-filter: blur(1px);
-  z-index: 20;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 14px;
-  color: var(--dg-text-secondary);
-  font-weight: 500;
-}
-
-.dg-no-rows {
-  grid-column: 1 / -1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--dg-text-muted);
-  font-size: 14px;
-  padding: 20px;
-}
-
-/* Footer */
-.dg-footer {
-  height: 40px;
-  border-top: 1px solid var(--dg-border);
-  background: var(--dg-surface);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 16px;
-  font-size: 13px;
-  color: var(--dg-text-secondary);
-}
-.dg-page-btn {
-  border: 1px solid var(--dg-border);
-  background: white;
-  padding: 4px 10px;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 12px;
-}
-.dg-page-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-
-/* Actions */
-.dg-action-btn {
-  padding: 4px 8px;
-  background: white;
-  border: 1px solid var(--dg-border);
-  border-radius: 4px;
-  cursor: pointer;
-}
-.dg-action-dropdown {
-  position: absolute;
-  top: 100%; right: 0;
-  background: white;
-  border: 1px solid var(--dg-border);
-  box-shadow: var(--dg-shadow-md);
-  z-index: 100;
-  border-radius: 4px;
-  padding: 4px;
-  min-width: 120px;
-}
-.dg-dropdown-item {
-  padding: 6px 10px;
-  font-size: 13px;
-  cursor: pointer;
-  border-radius: 2px;
-}
-.dg-dropdown-item:hover { background: var(--dg-surface-hover); color: var(--dg-primary); }
-
-/* Pinned Cols */
-.pinned-left { position: sticky; left: 0; z-index: 2; border-right: 1px solid #cbd5e1; }
-.pinned-right { position: sticky; right: 0; z-index: 2; border-left: 1px solid #cbd5e1; }
-.dg-header-cell.pinned-left, .dg-header-cell.pinned-right { z-index: 12; background: var(--dg-surface-alt); }
-.dg-cell.pinned-left, .dg-cell.pinned-right { background: var(--dg-surface); }
-`;
+import './EssealDataTable.css'
 
 // --- Types ---
-
 export interface GridRenderCellParams<T = any> {
   value: any;
   row: T;
@@ -389,6 +92,15 @@ type RowNode<T> = {
   data: T;
 };
 
+interface ActionCellProps<T> {
+  row: T;
+  actions: GridAction<T>[];
+  maxVisible: number;
+  isOpen: boolean;
+  onToggle: () => void;
+  onClose: () => void;
+}
+
 // --- Helper: Icons ---
 const PinIcon = () => (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -398,7 +110,7 @@ const PinIcon = () => (
 );
 
 // --- Helper: Action Cell ---
-function ActionCell<T>({ row, actions, maxVisible, isOpen, onToggle, onClose }: any) {
+function ActionCell<T>({ row, actions, maxVisible, isOpen, onToggle, onClose }: ActionCellProps<T>) {
   const menuRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!isOpen) return;
@@ -500,7 +212,7 @@ function sortRows<T>(rows: T[], sortModel: SortModel | null): T[] {
 }
 
 // --- Main Component ---
-export function EssealTable<T extends { id: string | number }>({
+export function EssealDataTable<T extends { id: string | number }>({
   rows,
   columns: initialColumns,
   groupBy = [],
@@ -520,11 +232,14 @@ export function EssealTable<T extends { id: string | number }>({
 
   const [cols, setCols] = useState(initialColumns);
 
-  // -- State Initialization --
+  // @ts-expect-error setActiveGroupBy exists but we don't use it
+  // it is here just for convention purposes
   const [activeGroupBy, setActiveGroupBy] = useState<string[]>(
     initialState?.groupBy ?? (groupBy as string[]) ?? []
   );
 
+  // @ts-expect-error setActiveRowHeight exists but we don't use it
+  // it is here just for convention purposes
   const [activeRowHeight, setActiveRowHeight] = useState<number>(
     initialState?.rowHeight ?? rowHeight ?? 40
   );
@@ -586,16 +301,6 @@ export function EssealTable<T extends { id: string | number }>({
       onStateChange(currentState);
     }
   }, [currentPage, sortModel, filters, expandedGroups, activeGroupBy, activeRowHeight, columnVisibility, pinnedColumns, onStateChange]);
-
-  // Inject Styles
-  useEffect(() => {
-    if (!document.getElementById('esseal-table-styles')) {
-      const style = document.createElement('style');
-      style.id = 'esseal-table-styles';
-      style.textContent = gridStyles;
-      document.head.appendChild(style);
-    }
-  }, []);
 
   // Click Outside Handlers
   useEffect(() => {
