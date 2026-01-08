@@ -62,22 +62,21 @@ const gridStyles = `
 }
 .dg-toolbar-btn:hover { background: var(--dg-surface-hover); color: var(--dg-text-primary); }
 
-/* Column Picker Menu */
-.dg-column-menu {
+/* Menus (Column Picker & Pin Menu) */
+.dg-menu {
   position: absolute;
-  top: 45px;
-  right: 12px;
   background: white;
   border: 1px solid var(--dg-border);
   box-shadow: var(--dg-shadow-md);
   border-radius: 6px;
   z-index: 50;
-  width: 200px;
-  max-height: 300px;
-  overflow-y: auto;
-  padding: 6px;
+  min-width: 140px;
+  padding: 4px;
 }
-.dg-column-menu-item {
+.dg-column-menu { top: 45px; right: 12px; width: 200px; max-height: 300px; overflow-y: auto; }
+.dg-pin-menu { top: 100%; left: 0; margin-top: 4px; }
+
+.dg-menu-item {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -87,8 +86,8 @@ const gridStyles = `
   cursor: pointer;
   border-radius: 4px;
 }
-.dg-column-menu-item:hover { background: var(--dg-surface-hover); }
-.dg-column-menu-item input { cursor: pointer; }
+.dg-menu-item:hover { background: var(--dg-surface-hover); color: var(--dg-primary); }
+.dg-menu-item.active { background: var(--dg-primary-light); color: var(--dg-primary); }
 
 /* Viewport */
 .dg-viewport::-webkit-scrollbar { width: 10px; height: 10px; }
@@ -131,11 +130,31 @@ const gridStyles = `
 .dg-header-main {
   display: flex;
   align-items: center;
+  justify-content: space-between; /* Space for pin icon */
   gap: 6px;
-  cursor: pointer;
   user-select: none;
   min-height: 20px;
 }
+
+.dg-header-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  flex-grow: 1;
+}
+
+.dg-pin-icon {
+  opacity: 0; 
+  cursor: pointer; 
+  padding: 2px;
+  border-radius: 4px;
+  color: var(--dg-text-muted);
+}
+.dg-header-cell:hover .dg-pin-icon, .dg-pin-icon.pinned { opacity: 1; }
+.dg-pin-icon:hover { background: var(--dg-border); color: var(--dg-text-primary); }
+.dg-pin-icon.pinned { color: var(--dg-primary); }
+
 
 /* Column Filter Input */
 .dg-column-filter {
@@ -305,6 +324,7 @@ export interface GridAction<T> {
 }
 
 type SortDirection = 'asc' | 'desc';
+type PinDirection = 'left' | 'right' | false;
 
 export interface SortModel {
   field: string;
@@ -322,7 +342,8 @@ export interface TableState {
   expandedGroups: Record<string, boolean>;
   groupBy: string[];
   rowHeight: number;
-  columnVisibility: Record<string, boolean>; // New: Column Visibility
+  columnVisibility: Record<string, boolean>;
+  pinnedColumns: Record<string, PinDirection>; // New: Pinned Columns State
 }
 
 export interface DataGridProps<T> {
@@ -345,7 +366,7 @@ export interface DataGridProps<T> {
   checkboxSelection?: boolean;
   pagination?: boolean;
   pageSize?: number;
-  disableColumnMenu?: boolean; // New: Option to hide the column picker
+  disableColumnMenu?: boolean;
 
   // Events
   onSelectionChange?: (selectedIds: (string | number)[]) => void;
@@ -367,6 +388,14 @@ type RowNode<T> = {
   id: string | number;
   data: T;
 };
+
+// --- Helper: Icons ---
+const PinIcon = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="12" y1="17" x2="12" y2="22"></line>
+    <path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"></path>
+  </svg>
+);
 
 // --- Helper: Action Cell ---
 function ActionCell<T>({ row, actions, maxVisible, isOpen, onToggle, onClose }: any) {
@@ -485,7 +514,7 @@ export function EssealTable<T extends { id: string | number }>({
   checkboxSelection = false,
   pagination = false,
   pageSize = 10,
-  disableColumnMenu = false, // Default: false
+  disableColumnMenu = false,
   onSelectionChange
 }: DataGridProps<T>) {
 
@@ -500,12 +529,21 @@ export function EssealTable<T extends { id: string | number }>({
     initialState?.rowHeight ?? rowHeight ?? 40
   );
 
-  // Initialize Visibility based on props.hide OR initialState
   const [columnVisibility, setColumnVisibility] = useState<Record<string, boolean>>(() => {
     if (initialState?.columnVisibility) return initialState.columnVisibility;
     const defaults: Record<string, boolean> = {};
     initialColumns.forEach(c => {
       defaults[String(c.field)] = !c.hide;
+    });
+    return defaults;
+  });
+
+  // NEW: Pinned Columns State
+  const [pinnedColumns, setPinnedColumns] = useState<Record<string, PinDirection>>(() => {
+    if (initialState?.pinnedColumns) return initialState.pinnedColumns;
+    const defaults: Record<string, PinDirection> = {};
+    initialColumns.forEach(c => {
+      if (c.pinned) defaults[String(c.field)] = c.pinned;
     });
     return defaults;
   });
@@ -519,9 +557,11 @@ export function EssealTable<T extends { id: string | number }>({
   const [scrollTop, setScrollTop] = useState(0);
   const [activeMenuRowId, setActiveMenuRowId] = useState<string | number | null>(null);
 
-  // UI State for Column Picker
+  // UI State for Menus
   const [showColumnMenu, setShowColumnMenu] = useState(false);
   const columnMenuRef = useRef<HTMLDivElement>(null);
+  const [activePinMenuCol, setActivePinMenuCol] = useState<string | null>(null);
+  const pinMenuRef = useRef<HTMLDivElement>(null);
 
   // -- Persistence Effect --
   const isFirstRender = useRef(true);
@@ -540,11 +580,12 @@ export function EssealTable<T extends { id: string | number }>({
         expandedGroups,
         groupBy: activeGroupBy,
         rowHeight: activeRowHeight,
-        columnVisibility // Persisting Visibility
+        columnVisibility,
+        pinnedColumns // Persisting Pinned State
       };
       onStateChange(currentState);
     }
-  }, [currentPage, sortModel, filters, expandedGroups, activeGroupBy, activeRowHeight, columnVisibility, onStateChange]);
+  }, [currentPage, sortModel, filters, expandedGroups, activeGroupBy, activeRowHeight, columnVisibility, pinnedColumns, onStateChange]);
 
   // Inject Styles
   useEffect(() => {
@@ -556,40 +597,49 @@ export function EssealTable<T extends { id: string | number }>({
     }
   }, []);
 
-  // Handle outside click for Column Menu
+  // Click Outside Handlers
   useEffect(() => {
-    if (!showColumnMenu) return;
+    if (!showColumnMenu && !activePinMenuCol) return;
     const handleClick = (e: MouseEvent) => {
       if (columnMenuRef.current && !columnMenuRef.current.contains(e.target as Node)) {
         setShowColumnMenu(false);
       }
+      if (pinMenuRef.current && !pinMenuRef.current.contains(e.target as Node)) {
+        setActivePinMenuCol(null);
+      }
     };
     document.addEventListener('mousedown', handleClick);
     return () => document.removeEventListener('mousedown', handleClick);
-  }, [showColumnMenu]);
+  }, [showColumnMenu, activePinMenuCol]);
 
-  // Toggle Visibility Handler
+  // Column Handlers
   const toggleColumn = (field: string) => {
-    setColumnVisibility(prev => ({
-      ...prev,
-      [field]: !prev[field]
-    }));
+    setColumnVisibility(prev => ({ ...prev, [field]: !prev[field] }));
   };
 
-  // 1. Column Processing
+  const handlePinColumn = (field: string, direction: PinDirection) => {
+    setPinnedColumns(prev => ({ ...prev, [field]: direction }));
+    setActivePinMenuCol(null);
+  };
+
+  // 1. Column Processing (Updated to use Pinned State)
   const { sortedCols, gridTemplateColumns } = useMemo(() => {
-    // Filter based on columnVisibility state instead of just prop
+    // Filter visible
     const visibleCols = cols.filter(c => columnVisibility[String(c.field)] !== false);
 
-    const pinnedLeft = visibleCols.filter(c => c.pinned === 'left');
-    const pinnedRight = visibleCols.filter(c => c.pinned === 'right');
-    const unpinned = visibleCols.filter(c => !c.pinned);
+    // Sort by Pinning State
+    const pinnedLeft = visibleCols.filter(c => pinnedColumns[String(c.field)] === 'left');
+    const pinnedRight = visibleCols.filter(c => pinnedColumns[String(c.field)] === 'right');
+    const unpinned = visibleCols.filter(c => !pinnedColumns[String(c.field)] && c.field !== '__checkbox' && c.field !== '__actions');
 
+    // Re-inject System Columns if enabled
     if (checkboxSelection) {
+      // Ensure checkbox is always left pinned
       pinnedLeft.unshift({ field: '__checkbox', headerName: '', width: 40, pinned: 'left', sortable: false, filterable: false });
     }
 
     if (rowActions) {
+      // Ensure actions is always right pinned
       pinnedRight.push({
         field: '__actions',
         headerName: 'Actions',
@@ -600,9 +650,17 @@ export function EssealTable<T extends { id: string | number }>({
       });
     }
 
-    const sorted = [...pinnedLeft, ...unpinned, ...pinnedRight];
-    return { sortedCols: sorted, gridTemplateColumns: sorted.map(c => `${c.width}px`).join(' ') };
-  }, [cols, columnVisibility, rowActions, maxVisibleActions, checkboxSelection]);
+    // Attach "virtual" pinned status to the column objects so the renderer knows where to stick them
+    const attachPin = (c: GridColDef<T>, p: 'left' | 'right' | false): GridColDef<T> => ({ ...c, pinned: p });
+
+    const finalCols = [
+      ...pinnedLeft.map(c => attachPin(c, 'left')),
+      ...unpinned.map(c => attachPin(c, false)),
+      ...pinnedRight.map(c => attachPin(c, 'right'))
+    ];
+
+    return { sortedCols: finalCols, gridTemplateColumns: finalCols.map(c => `${c.width}px`).join(' ') };
+  }, [cols, columnVisibility, pinnedColumns, rowActions, maxVisibleActions, checkboxSelection]);
 
   // 2. Data Pipeline
   const processedRows = useMemo(() => {
@@ -684,7 +742,7 @@ export function EssealTable<T extends { id: string | number }>({
       {/* Loading Overlay */}
       {loading && <div className="dg-overlay">Loading data...</div>}
 
-      {/* Toolbar - New Feature */}
+      {/* Toolbar */}
       {!disableColumnMenu && (
         <div className="dg-toolbar">
           <div style={{ position: 'relative' }}>
@@ -693,9 +751,9 @@ export function EssealTable<T extends { id: string | number }>({
               <span style={{ fontSize: '10px' }}>▼</span>
             </button>
             {showColumnMenu && (
-              <div className="dg-column-menu" ref={columnMenuRef}>
+              <div className="dg-menu dg-column-menu" ref={columnMenuRef}>
                 {cols.map(col => (
-                  <label key={String(col.field)} className="dg-column-menu-item">
+                  <label key={String(col.field)} className="dg-menu-item">
                     <input
                       type="checkbox"
                       checked={columnVisibility[String(col.field)] !== false}
@@ -712,25 +770,66 @@ export function EssealTable<T extends { id: string | number }>({
 
       <div className="dg-viewport"
         onScroll={e => setScrollTop(e.currentTarget.scrollTop)}
-        style={{ overflowY: 'auto', height: pagination ? 'calc(100% - 80px)' : 'calc(100% - 40px)' }}> {/* Adjusted for toolbar height */}
+        style={{ overflowY: 'auto', height: pagination ? 'calc(100% - 80px)' : 'calc(100% - 40px)' }}>
 
         {/* Header */}
         <div className="dg-header-row" style={{ gridTemplateColumns }}>
           {sortedCols.map((col, idx) => {
-            const style = getStickyStyle(idx);
+            const isMenuOpen = activePinMenuCol === col.field;
+
+            // FIX: Boost zIndex if this cell's menu is open, so it sits above sibling sticky headers.
+            const style = {
+              ...getStickyStyle(idx),
+              zIndex: isMenuOpen ? 100 : (col.pinned ? 12 : undefined)
+            };
+
+            const isSystemCol = ['__checkbox', '__actions'].includes(String(col.field));
+            const isPinned = !!pinnedColumns[String(col.field)];
+
             return (
               <div key={String(col.field)} className={`dg-header-cell ${col.pinned ? `pinned-${col.pinned}` : ''}`} style={style}>
-                <div className="dg-header-main" onClick={() => col.sortable !== false && setSortModel(p => p?.field === col.field && p.direction === 'asc' ? { field: String(col.field), direction: 'desc' } : { field: String(col.field), direction: 'asc' })}>
-                  {col.field === '__checkbox' ? (
-                    <input type="checkbox" onChange={handleSelectAll} className="dg-checkbox" />
-                  ) : (
-                    <>
-                      <span>{col.headerName}</span>
-                      {sortModel?.field === col.field && <span>{sortModel.direction === 'asc' ? ' ↑' : ' ↓'}</span>}
-                    </>
+                <div className="dg-header-main">
+
+                  {/* Left: Title & Sort */}
+                  <div className="dg-header-title" onClick={() => col.sortable !== false && !isSystemCol && setSortModel(p => p?.field === col.field && p.direction === 'asc' ? { field: String(col.field), direction: 'desc' } : { field: String(col.field), direction: 'asc' })}>
+                    {col.field === '__checkbox' ? (
+                      <input type="checkbox" onChange={handleSelectAll} className="dg-checkbox" />
+                    ) : (
+                      <>
+                        <span>{col.headerName}</span>
+                        {sortModel?.field === col.field && <span>{sortModel.direction === 'asc' ? ' ↑' : ' ↓'}</span>}
+                      </>
+                    )}
+                  </div>
+
+                  {/* Right: Pin Menu (Not for system cols) */}
+                  {!isSystemCol && (
+                    <div style={{ position: 'relative' }}>
+                      <div
+                        className={`dg-pin-icon ${isPinned ? 'pinned' : ''}`}
+                        onClick={(e) => { e.stopPropagation(); setActivePinMenuCol(activePinMenuCol === col.field ? null : String(col.field)); }}
+                      >
+                        <PinIcon />
+                      </div>
+
+                      {/* Pin Dropdown */}
+                      {activePinMenuCol === col.field && (
+                        <div className="dg-menu dg-pin-menu" ref={pinMenuRef}>
+                          <div className={`dg-menu-item ${pinnedColumns[String(col.field)] === 'left' ? 'active' : ''}`}
+                            onClick={() => handlePinColumn(String(col.field), 'left')}>Pin Left</div>
+                          <div className={`dg-menu-item ${pinnedColumns[String(col.field)] === 'right' ? 'active' : ''}`}
+                            onClick={() => handlePinColumn(String(col.field), 'right')}>Pin Right</div>
+                          <div className={`dg-menu-item ${!pinnedColumns[String(col.field)] ? 'active' : ''}`}
+                            onClick={() => handlePinColumn(String(col.field), false)}>No Pin</div>
+                        </div>
+                      )}
+                    </div>
                   )}
+
                 </div>
-                {col.filterable !== false && !['__checkbox', '__actions'].includes(String(col.field)) && (
+
+                {/* Filter Row */}
+                {col.filterable !== false && !isSystemCol && (
                   <input
                     className="dg-column-filter"
                     placeholder="search..."
@@ -739,7 +838,7 @@ export function EssealTable<T extends { id: string | number }>({
                     onChange={e => setFilters(p => ({ ...p, [col.field as string]: e.target.value }))}
                   />
                 )}
-                {!['__checkbox', '__actions'].includes(String(col.field)) && (
+                {!isSystemCol && (
                   <div className="dg-resizer" onMouseDown={e => handleMouseDown(e, String(col.field), col.width)} onClick={e => e.stopPropagation()} />
                 )}
               </div>
