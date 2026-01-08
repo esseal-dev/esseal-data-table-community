@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
-import { EssealTable, type GridAction, type GridColDef } from './EssealTable';
+import { EssealTable, type GridColDef, type GridAction } from './EssealTable';
 
-// --- 1. Mock Data Generator ---
+// --- 1. Mock Data Generator
 interface UserRow {
   id: number;
   name: string;
@@ -23,7 +23,6 @@ const generateData = (count: number): UserRow[] => {
   return Array.from({ length: count }, (_, index) => {
     const name = `${NAMES[Math.floor(Math.random() * NAMES.length)]} ${SURNAMES[Math.floor(Math.random() * SURNAMES.length)]}`;
     const dept = DEPARTMENTS[Math.floor(Math.random() * DEPARTMENTS.length)];
-
     return {
       id: index + 1,
       name,
@@ -37,173 +36,182 @@ const generateData = (count: number): UserRow[] => {
   });
 };
 
-// --- 2. Main App Component ---
+
 export default function App() {
+  // Data State
   const [rows, setRows] = useState<UserRow[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Grid Feature State
+  const [groupBy, setGroupBy] = useState<(keyof UserRow)[]>([]);
+  const [showCheckboxes, setShowCheckboxes] = useState(true);
+  const [enablePagination, setEnablePagination] = useState(true);
   const [selection, setSelection] = useState<(string | number)[]>([]);
 
-  // Simulate data fetching
+  // Load Initial Data
   useEffect(() => {
-    setLoading(true);
-    // Simulate network delay
+    // Simulate API Load
     setTimeout(() => {
-      setRows(generateData(1000));
+      setRows(generateData(500));
       setLoading(false);
-    }, 800);
+    }, 600);
   }, []);
 
-  // --- Column Definitions ---
+  // Columns Configuration
   const columns = useMemo<GridColDef<UserRow>[]>(() => [
-    {
-      field: 'id',
-      headerName: 'ID',
-      width: 70,
-      pinned: 'left' // Pin ID to the left
-    },
-    {
-      field: 'name',
-      headerName: 'Full Name',
-      width: 180,
-      pinned: 'left' // Pin Name to the left as well
-    },
+    { field: 'id', headerName: 'ID', width: 60, pinned: 'left' },
+    { field: 'name', headerName: 'Full Name', width: 180, pinned: 'left' },
     {
       field: 'status',
       headerName: 'Status',
       width: 120,
-      // Custom Renderer Example: Badges
       renderCell: ({ value }) => {
-        let bg = '#f3f4f6';
-        let color = '#374151';
-
-        switch (value) {
-          case 'Active': bg = '#dcfce7'; color = '#166534'; break;
-          case 'Pending': bg = '#fef9c3'; color = '#854d0e'; break;
-          case 'Banned': bg = '#fee2e2'; color = '#991b1b'; break;
-        }
-
+        const colors: Record<string, string> = {
+          Active: '#dcfce7', Pending: '#fef9c3', Inactive: '#f3f4f6', Banned: '#fee2e2'
+        };
+        const text: Record<string, string> = {
+          Active: '#166534', Pending: '#854d0e', Inactive: '#374151', Banned: '#991b1b'
+        };
         return (
-          <span style={{
-            background: bg,
-            color: color,
-            padding: '2px 10px',
-            borderRadius: '99px',
-            fontSize: '12px',
-            fontWeight: 500
-          }}>
+          <span style={{ background: colors[value], color: text[value], padding: '2px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: 600 }}>
             {value}
           </span>
         );
       }
     },
-    { field: 'email', headerName: 'Email Address', width: 220 },
     { field: 'department', headerName: 'Department', width: 150 },
     { field: 'role', headerName: 'Job Role', width: 150 },
     {
       field: 'budget',
-      headerName: 'Annual Budget',
-      width: 140,
-      // Custom Renderer: Currency Formatting
-      renderCell: ({ value }) => (
-        <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>
-          ${value.toLocaleString()}
-        </span>
-      )
+      headerName: 'Budget',
+      width: 130,
+      renderCell: ({ value }) => <span style={{ fontFamily: 'monospace' }}>${value.toLocaleString()}</span>
     },
+    { field: 'email', headerName: 'Email', width: 220 },
     { field: 'lastLogin', headerName: 'Last Login', width: 120 },
   ], []);
 
-  // --- Row Actions ---
-  const getRowActions = (row: UserRow): GridAction<UserRow>[] => {
-    return [
-      {
-        label: 'Edit',
-        onClick: (r) => alert(`Editing user: ${r.name}`),
-      },
-      {
-        label: 'View Profile',
-        onClick: (r) => console.log('View profile', r.id),
-      },
-      {
-        label: 'Delete',
-        onClick: (r) => {
-          if (confirm(`Are you sure you want to delete ${r.name}?`)) {
-            setRows(prev => prev.filter(x => x.id !== r.id));
-          }
-        },
-      }
-    ];
+  // Row Actions Definition
+  const rowActions = (row: UserRow): GridAction<UserRow>[] => [
+    { label: 'Edit', onClick: () => alert(`Edit ${row.name}`) },
+    { label: 'Delete', onClick: () => alert(`Delete ${row.name}`) },
+  ];
+
+  // Helper to toggle grouping fields
+  const toggleGroupBy = (field: keyof UserRow) => {
+    setGroupBy(prev =>
+      prev.includes(field) ? prev.filter(f => f !== field) : [...prev, field]
+    );
   };
 
   return (
-    <div style={{
-      padding: '40px',
-      background: '#f1f5f9',
-      minHeight: '100vh',
-      fontFamily: 'Inter, sans-serif'
-    }}>
-      <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
+    <div style={{ padding: '40px', background: '#f8fafc', minHeight: '100vh', fontFamily: 'Inter, sans-serif' }}>
+      <div style={{ maxWidth: '1200px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '16px' }}>
 
-        <div style={{ marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        {/* --- Header Section --- */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'end' }}>
           <div>
-            <h1 style={{ fontSize: '24px', fontWeight: 'bold', color: '#0f172a', margin: 0 }}>
-              EssealTable Demo
-            </h1>
-            <p style={{ color: '#64748b', marginTop: '4px' }}>
-              High performance DataGrid with 1,000 virtualized rows.
+            <h1 style={{ margin: 0, fontSize: '24px', color: '#0f172a' }}>EssealTable</h1>
+            <p style={{ margin: '4px 0 0', color: '#64748b', fontSize: '14px' }}>
+              Interactive Sandbox · {rows.length} rows loaded
             </p>
           </div>
+          <button
+            onClick={() => { setLoading(true); setTimeout(() => setLoading(false), 800); }}
+            style={{ padding: '8px 16px', background: 'white', border: '1px solid #cbd5e1', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: 500 }}
+          >
+            ⟳ Reload Data
+          </button>
+        </div>
 
-          <div style={{ display: 'flex', gap: '10px' }}>
-            <button
-              onClick={() => {
-                setLoading(true);
-                setTimeout(() => setLoading(false), 1000);
-              }}
-              style={{ padding: '8px 16px', borderRadius: '6px', border: '1px solid #cbd5e1', cursor: 'pointer' }}
-            >
-              Reload Data
-            </button>
+        {/* --- Controls Toolbar --- */}
+        <div style={{ background: 'white', padding: '16px', borderRadius: '8px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '16px', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}>
+
+          {/* Grouping Controls */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <span style={{ fontSize: '13px', fontWeight: 600, color: '#475569', minWidth: '70px' }}>Group By:</span>
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              {['department', 'role', 'status'].map((field) => {
+                const isActive = groupBy.includes(field as keyof UserRow);
+                return (
+                  <button
+                    key={field}
+                    onClick={() => toggleGroupBy(field as keyof UserRow)}
+                    style={{
+                      padding: '6px 12px',
+                      borderRadius: '20px',
+                      border: `1px solid ${isActive ? '#0ea5e9' : '#e2e8f0'}`,
+                      background: isActive ? '#e0f2fe' : 'white',
+                      color: isActive ? '#0284c7' : '#64748b',
+                      fontSize: '12px',
+                      fontWeight: 500,
+                      cursor: 'pointer',
+                      transition: 'all 0.2s'
+                    }}
+                  >
+                    {field.charAt(0).toUpperCase() + field.slice(1)}
+                    {isActive && <span style={{ marginLeft: '6px' }}>×</span>}
+                  </button>
+                );
+              })}
+            </div>
+            {groupBy.length > 0 && (
+              <button onClick={() => setGroupBy([])} style={{ fontSize: '12px', color: '#94a3b8', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>
+                Clear Grouping
+              </button>
+            )}
+          </div>
+
+          <div style={{ height: '1px', background: '#f1f5f9' }} />
+
+          {/* Feature Toggles */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
+            <span style={{ fontSize: '13px', fontWeight: 600, color: '#475569', minWidth: '70px' }}>Settings:</span>
+
+            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', cursor: 'pointer' }}>
+              <input type="checkbox" checked={showCheckboxes} onChange={e => setShowCheckboxes(e.target.checked)} />
+              Show Checkboxes
+            </label>
+
+            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', cursor: 'pointer' }}>
+              <input type="checkbox" checked={enablePagination} onChange={e => setEnablePagination(e.target.checked)} />
+              Enable Pagination
+            </label>
+
+            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', cursor: 'pointer' }}>
+              <input type="checkbox" checked={loading} onChange={e => setLoading(e.target.checked)} />
+              Force Loading State
+            </label>
           </div>
         </div>
 
-        {/* Selected Items Summary */}
-        {selection.length > 0 && (
-          <div style={{
-            marginBottom: '16px',
-            padding: '10px',
-            background: '#e0f2fe',
-            color: '#0369a1',
-            borderRadius: '6px',
-            fontSize: '14px'
-          }}>
-            <strong>{selection.length}</strong> row(s) selected.
-          </div>
-        )}
+        {/* --- The Table --- */}
+        <div style={{ height: '600px', background: 'white', borderRadius: '8px', overflow: 'hidden' }}>
+          <EssealTable
+            rows={rows}
+            columns={columns}
 
-        {/* --- THE GRID COMPONENT --- */}
-        <EssealTable
-          rows={rows}
-          columns={columns}
-          height={600}
-          rowHeight={45}
+            // Dynamic Props
+            groupBy={groupBy}
+            loading={loading}
+            checkboxSelection={showCheckboxes}
+            pagination={enablePagination}
+            pageSize={50}
 
-          // Features
-          loading={loading}
-          checkboxSelection={true}
-          pagination={true}
-          pageSize={50} // 50 rows per page
+            // Layout
+            rowHeight={42}
+            height={600}
 
-          // Try grouping by Department!
-          // groupBy={['department']} 
+            // Actions & Events
+            rowActions={rowActions}
+            onSelectionChange={setSelection}
+          />
+        </div>
 
-          // Actions
-          rowActions={getRowActions}
-          maxVisibleActions={1} // Show 1 button, put rest in menu
-
-          // Events
-          onSelectionChange={(ids) => setSelection(ids)}
-        />
+        {/* --- Selection Footer --- */}
+        <div style={{ fontSize: '13px', color: '#64748b', textAlign: 'right' }}>
+          Selected IDs: {selection.length > 0 ? selection.join(', ') : 'None'}
+        </div>
 
       </div>
     </div>
