@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { EssealTable, type GridColDef, type GridAction } from './EssealTable';
+import { EssealTable, type GridColDef, type GridAction, type TableState } from './EssealTable';
 
 // --- Types & Constants ---
 type Density = 'compact' | 'standard' | 'comfortable';
@@ -114,6 +114,16 @@ export default function App() {
     color: active ? 'white' : '#64748b', flex: 1, textAlign: 'center' as const
   });
 
+  const handleStateChange = (newState: TableState) => {
+    console.log('%c Table State Updated:', 'color: #0ea5e9; font-weight: bold;', newState);
+
+    // Example of how you would access specific parts:
+    // console.log('Current Page:', newState.page);
+    // console.log('Active Filters:', newState.filterModel);
+    // console.log('Sort Config:', newState.sortModel);
+  };
+
+
   return (
     <div style={{ padding: '40px', background: '#f8fafc', minHeight: '100vh', fontFamily: 'Inter, sans-serif' }}>
       <div style={{ maxWidth: '1200px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -204,6 +214,7 @@ export default function App() {
             // Actions & Events
             rowActions={rowActions}
             onSelectionChange={setSelection}
+            onStateChange={handleStateChange}
           />
         </div>
 

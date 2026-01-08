@@ -87,8 +87,8 @@ const gridStyles = `
 /* Column Filter Input */
 .dg-column-filter {
   width: 100%;
-  box-sizing: border-box; /* 1. Ensure padding doesn't add to width */
-  min-width: 0;            /* 2. Allow input to shrink smaller than browser default */
+  box-sizing: border-box; 
+  min-width: 0;
   padding: 4px 6px;
   border: 1px solid var(--dg-border);
   border-radius: 4px;
@@ -239,10 +239,10 @@ export interface GridColDef<T = any> {
   headerName: string;
   width: number;
   pinned?: 'left' | 'right' | false;
-  hide?: boolean; // New: Support hidden columns
+  hide?: boolean;
   sortable?: boolean;
   filterable?: boolean;
-  renderCell?: (params: GridRenderCellParams<T>) => React.ReactNode; // New: Custom Renderer
+  renderCell?: (params: GridRenderCellParams<T>) => React.ReactNode;
 }
 
 export interface GridAction<T> {
@@ -253,22 +253,36 @@ export interface GridAction<T> {
 
 type SortDirection = 'asc' | 'desc';
 
-interface SortModel {
+export interface SortModel {
   field: string;
   direction: SortDirection;
 }
 
-interface FilterModel {
+export interface FilterModel {
   [field: string]: string;
+}
+
+// -- Persistence Types (Updated) --
+export interface TableState {
+  page: number;
+  sortModel: SortModel | null;
+  filterModel: FilterModel;
+  expandedGroups: Record<string, boolean>;
+  groupBy: string[];    // New: Stores which columns are grouped
+  rowHeight: number;    // New: Stores density (compact/standard)
 }
 
 export interface DataGridProps<T> {
   rows: T[];
   columns: GridColDef<T>[];
-  groupBy?: (keyof T)[];
-  rowHeight?: number;
+  groupBy?: (keyof T)[]; // Treated as default/fallback if passed
+  rowHeight?: number;    // Treated as default/fallback if passed
   height?: number;
-  loading?: boolean; // New: Loading state
+  loading?: boolean;
+
+  // Persistence Props
+  initialState?: Partial<TableState>;
+  onStateChange?: (state: TableState) => void;
 
   // Actions
   rowActions?: (row: T) => GridAction<T>[];
@@ -410,6 +424,8 @@ export function EssealTable<T extends { id: string | number }>({
   rowHeight = 40,
   height = 600,
   loading = false,
+  initialState,
+  onStateChange,
   rowActions,
   maxVisibleActions = 1,
   checkboxSelection = false,
@@ -419,13 +435,47 @@ export function EssealTable<T extends { id: string | number }>({
 }: DataGridProps<T>) {
 
   const [cols, setCols] = useState(initialColumns);
-  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
-  const [sortModel, setSortModel] = useState<SortModel | null>(null);
-  const [filters, setFilters] = useState<FilterModel>({});
+
+  // -- State Initialization --
+  // We prioritize initialState, then fallback to props, then default values.
+  const [activeGroupBy, setActiveGroupBy] = useState<string[]>(
+    initialState?.groupBy ?? (groupBy as string[]) ?? []
+  );
+
+  const [activeRowHeight, setActiveRowHeight] = useState<number>(
+    initialState?.rowHeight ?? rowHeight ?? 40
+  );
+
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>(initialState?.expandedGroups ?? {});
+  const [sortModel, setSortModel] = useState<SortModel | null>(initialState?.sortModel ?? null);
+  const [filters, setFilters] = useState<FilterModel>(initialState?.filterModel ?? {});
+  const [currentPage, setCurrentPage] = useState(initialState?.page ?? 1);
+
   const [selection, setSelection] = useState<Set<string | number>>(new Set());
-  const [currentPage, setCurrentPage] = useState(1);
   const [scrollTop, setScrollTop] = useState(0);
   const [activeMenuRowId, setActiveMenuRowId] = useState<string | number | null>(null);
+
+  // -- Persistence Effect --
+  const isFirstRender = useRef(true);
+
+  useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
+
+    if (onStateChange) {
+      const currentState: TableState = {
+        page: currentPage,
+        sortModel,
+        filterModel: filters,
+        expandedGroups,
+        groupBy: activeGroupBy,   // Persisting Grouping
+        rowHeight: activeRowHeight // Persisting Density
+      };
+      onStateChange(currentState);
+    }
+  }, [currentPage, sortModel, filters, expandedGroups, activeGroupBy, activeRowHeight, onStateChange]);
 
   // Inject Styles
   useEffect(() => {
@@ -463,13 +513,14 @@ export function EssealTable<T extends { id: string | number }>({
     return { sortedCols: sorted, gridTemplateColumns: sorted.map(c => `${c.width}px`).join(' ') };
   }, [cols, rowActions, maxVisibleActions, checkboxSelection]);
 
-  // 2. Data Pipeline
+  // 2. Data Pipeline (Updated to use activeGroupBy from state)
   const processedRows = useMemo(() => {
     let res = filterRows(rows, filters);
     res = sortRows(res, sortModel);
-    const tree = groupRows(res, groupBy);
+    // Use activeGroupBy instead of the prop
+    const tree = groupRows(res, activeGroupBy as (keyof T)[]);
     return flattenTree(tree, expandedGroups);
-  }, [rows, filters, sortModel, groupBy, expandedGroups]);
+  }, [rows, filters, sortModel, activeGroupBy, expandedGroups]);
 
   // 3. Pagination & Virtualization
   const rowsToRender = useMemo(() => {
@@ -479,14 +530,14 @@ export function EssealTable<T extends { id: string | number }>({
   }, [processedRows, pagination, currentPage, pageSize]);
 
   const totalPages = pagination ? Math.ceil(processedRows.length / pageSize) : 1;
-  const totalContentHeight = rowsToRender.length * rowHeight;
+  const totalContentHeight = rowsToRender.length * activeRowHeight; // Use activeRowHeight
 
   // Virtualization calculations
   const buffer = 4;
-  const startIndex = Math.floor(scrollTop / rowHeight);
-  const endIndex = Math.min(rowsToRender.length, Math.floor((scrollTop + height) / rowHeight) + buffer);
+  const startIndex = Math.floor(scrollTop / activeRowHeight);
+  const endIndex = Math.min(rowsToRender.length, Math.floor((scrollTop + height) / activeRowHeight) + buffer);
   const visibleRows = rowsToRender.slice(startIndex, endIndex);
-  const offsetY = startIndex * rowHeight;
+  const offsetY = startIndex * activeRowHeight;
 
   // Handlers
   const toggleGroup = (id: string) => setExpandedGroups(p => ({ ...p, [id]: !p[id] }));
@@ -504,7 +555,7 @@ export function EssealTable<T extends { id: string | number }>({
     onSelectionChange?.(Array.from(newSel));
   };
 
-  // Resize Logic (Robust)
+  // Resize Logic
   const resizingRef = useRef<{ field: string; startX: number; startWidth: number } | null>(null);
   const handleMouseDown = (e: React.MouseEvent, field: string, width: number) => {
     e.preventDefault(); e.stopPropagation();
@@ -564,8 +615,13 @@ export function EssealTable<T extends { id: string | number }>({
                   )}
                 </div>
                 {col.filterable !== false && !['__checkbox', '__actions'].includes(String(col.field)) && (
-                  <input className="dg-column-filter" placeholder="search..." onClick={e => e.stopPropagation()}
-                    onChange={e => setFilters(p => ({ ...p, [col.field as string]: e.target.value }))} />
+                  <input
+                    className="dg-column-filter"
+                    placeholder="search..."
+                    value={filters[col.field as string] || ''}
+                    onClick={e => e.stopPropagation()}
+                    onChange={e => setFilters(p => ({ ...p, [col.field as string]: e.target.value }))}
+                  />
                 )}
                 {!['__checkbox', '__actions'].includes(String(col.field)) && (
                   <div className="dg-resizer" onMouseDown={e => handleMouseDown(e, String(col.field), col.width)} onClick={e => e.stopPropagation()} />
@@ -585,7 +641,7 @@ export function EssealTable<T extends { id: string | number }>({
               if (item.type === 'group') {
                 return (
                   <div key={item.id} className="dg-group-row" onClick={() => toggleGroup(item.id)}
-                    style={{ gridColumn: '1 / -1', paddingLeft: `${item.depth * 20 + 12}px`, height: rowHeight }}>
+                    style={{ gridColumn: '1 / -1', paddingLeft: `${item.depth * 20 + 12}px`, height: activeRowHeight }}>
                     <span style={{ marginRight: 8 }}>{expandedGroups[item.id] ? '▼' : '▶'}</span>
                     <span>{String(item.field)}: <strong>{item.value}</strong> ({item.count})</span>
                   </div>
@@ -597,7 +653,7 @@ export function EssealTable<T extends { id: string | number }>({
               return (
                 <div key={row.id} className={`dg-row ${isSel ? 'selected' : ''}`}>
                   {sortedCols.map((col, idx) => {
-                    const style = { ...getStickyStyle(idx), height: rowHeight };
+                    const style = { ...getStickyStyle(idx), height: activeRowHeight };
                     if (col.field === '__checkbox') {
                       return <div key={`${row.id}-cb`} className={`dg-cell ${col.pinned || ''}`} style={style}>
                         <input type="checkbox" checked={isSel} onChange={() => handleSelectRow(row.id)} className="dg-checkbox" />
