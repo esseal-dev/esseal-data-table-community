@@ -1,9 +1,10 @@
-/* DataGrid Component - Corporate Theme */
+/* DataGrid Component - EssealTable Theme */
 
 :root {
-  --dg-primary: #2563eb;
-  --dg-primary-hover: #1d4ed8;
-  --dg-primary-light: #dbeafe;
+  --dg-primary: #0ea5e9; /* Brand 500 */
+  --dg-primary-hover: #0284c7; /* Brand 600 */
+  --dg-primary-light: #e0f2fe; /* Brand 100 */
+  --dg-selection-bg: #f0f9ff; /* Brand 50 */
 
   --dg-surface: #ffffff;
   --dg-surface-alt: #f8fafc;
@@ -17,149 +18,103 @@
   --dg-text-muted: #94a3b8;
 
   --dg-shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-  --dg-shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1),
-    0 2px 4px -1px rgba(0, 0, 0, 0.06);
-  --dg-shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1),
-    0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  --dg-shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  --dg-shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
 }
 
-/* Container */
 .dg-container {
   background: var(--dg-surface);
   border: 1px solid var(--dg-border);
   border-radius: 8px;
   overflow: hidden;
   box-shadow: var(--dg-shadow-sm);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen",
-    "Ubuntu", "Cantarell", sans-serif;
+  font-family: "Inter", sans-serif;
+  display: flex;
+  flex-direction: column;
 }
 
 /* Viewport */
-.dg-viewport {
-  background: var(--dg-surface);
-}
-
 .dg-viewport::-webkit-scrollbar {
-  width: 12px;
-  height: 12px;
+  width: 10px;
+  height: 10px;
 }
-
 .dg-viewport::-webkit-scrollbar-track {
-  background: var(--dg-surface-alt);
+  background: transparent;
 }
-
 .dg-viewport::-webkit-scrollbar-thumb {
-  background: var(--dg-border);
-  border-radius: 6px;
-  border: 3px solid var(--dg-surface-alt);
+  background: #cbd5e1;
+  border-radius: 5px;
+  border: 2px solid var(--dg-surface);
 }
-
 .dg-viewport::-webkit-scrollbar-thumb:hover {
-  background: var(--dg-text-muted);
+  background: #94a3b8;
 }
 
-/* Header Row */
+/* Header */
 .dg-header-row {
   background: var(--dg-surface-alt);
-  border-bottom: 2px solid var(--dg-border);
-  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--dg-border);
+  font-weight: 600;
+  color: var(--dg-text-secondary);
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
 }
 
-/* Header Cell */
 .dg-header-cell {
-  padding: 12px 16px;
-  font-weight: 600;
-  font-size: 13px;
-  color: var(--dg-text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  cursor: pointer;
-  user-select: none;
-  position: relative;
-  display: flex;
-  align-items: center;
-  background: var(--dg-surface-alt);
+  padding: 8px 12px;
   border-right: 1px solid var(--dg-border-light);
-  transition: background-color 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  position: relative;
+  background: var(--dg-surface-alt);
+  transition: background 0.2s;
 }
 
 .dg-header-cell:hover {
   background: var(--dg-surface-hover);
 }
 
-.dg-header-cell:last-child {
-  border-right: none;
-}
-
-.dg-header-content {
+.dg-header-main {
   display: flex;
   align-items: center;
   gap: 6px;
-  flex: 1;
+  cursor: pointer;
+  user-select: none;
+  min-height: 20px;
 }
 
-.dg-header-text {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+/* Column Filter Input */
+.dg-column-filter {
+  width: 100%;
+  padding: 4px 6px;
+  border: 1px solid var(--dg-border);
+  border-radius: 4px;
+  font-size: 11px;
+  color: var(--dg-text-primary);
+  margin-top: 2px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.dg-column-filter:focus {
+  border-color: var(--dg-primary);
 }
 
-.dg-sort-icon {
-  color: var(--dg-primary);
-  font-size: 14px;
-  font-weight: 700;
+/* Rows */
+.dg-row {
+  transition: background 0.15s;
+}
+.dg-row:hover .dg-cell {
+  background: var(--dg-surface-hover);
+}
+.dg-row.selected .dg-cell {
+  background: var(--dg-selection-bg);
 }
 
-/* Pinned Columns */
-.dg-header-cell.pinned-left,
-.dg-cell.pinned-left {
-  background: var(--dg-surface);
-  box-shadow: 2px 0 4px rgba(0, 0, 0, 0.04);
-}
-
-.dg-header-cell.pinned-left {
-  background: var(--dg-surface-alt);
-}
-
-.dg-header-cell.pinned-right,
-.dg-cell.pinned-right {
-  background: var(--dg-surface);
-  box-shadow: -2px 0 4px rgba(0, 0, 0, 0.04);
-}
-
-.dg-header-cell.pinned-right {
-  background: var(--dg-surface-alt);
-}
-
-/* Resizer */
-.dg-resizer {
-  position: absolute;
-  right: 0;
-  top: 0;
-  width: 4px;
-  height: 100%;
-  cursor: col-resize;
-  z-index: 1;
-  background: transparent;
-  transition: background-color 0.2s ease;
-}
-
-.dg-resizer:hover {
-  background: var(--dg-primary);
-}
-
-.dg-resizer:active {
-  background: var(--dg-primary-hover);
-}
-
-/* Body */
-.dg-body {
-  background: var(--dg-surface);
-}
-
-/* Cell */
 .dg-cell {
-  padding: 12px 16px;
+  padding: 0 12px;
   font-size: 14px;
   color: var(--dg-text-primary);
   border-bottom: 1px solid var(--dg-border-light);
@@ -168,176 +123,158 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  box-sizing: border-box;
-}
-
-.dg-cell:last-child {
-  border-right: none;
-}
-
-.dg-row:hover .dg-cell {
-  background: var(--dg-surface-hover);
 }
 
 /* Group Row */
 .dg-group-row {
-  padding: 10px 16px;
   background: var(--dg-primary-light);
   border-bottom: 1px solid var(--dg-border);
   cursor: pointer;
-  user-select: none;
   display: flex;
   align-items: center;
   font-size: 14px;
   color: var(--dg-text-primary);
-  transition: background-color 0.2s ease;
-}
-
-.dg-group-row:hover {
-  background: #bfdbfe;
-}
-
-/* Action Cell */
-.dg-action-cell {
-  position: relative;
-}
-
-.dg-action-btn {
-  padding: 6px 10px;
-  background: var(--dg-surface);
-  border: 1px solid var(--dg-border);
-  border-radius: 6px;
-  color: var(--dg-text-secondary);
-  font-size: 14px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 32px;
   font-weight: 500;
 }
+.dg-group-toggle {
+  margin-right: 8px;
+  font-size: 10px;
+  color: var(--dg-text-secondary);
+}
+.dg-group-count {
+  margin-left: 8px;
+  color: var(--dg-text-muted);
+  font-weight: 400;
+  font-size: 13px;
+}
 
+/* Resizer */
+.dg-resizer {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  cursor: col-resize;
+  z-index: 10;
+}
+.dg-resizer:hover {
+  background: var(--dg-primary);
+}
+
+/* Checkbox */
+.dg-checkbox {
+  cursor: pointer;
+  accent-color: var(--dg-primary);
+  width: 16px;
+  height: 16px;
+}
+
+/* Footer & Pagination */
+.dg-footer {
+  height: 40px;
+  border-top: 1px solid var(--dg-border);
+  background: var(--dg-surface);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  font-size: 13px;
+  color: var(--dg-text-secondary);
+}
+.dg-pagination-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.dg-page-btn {
+  border: 1px solid var(--dg-border);
+  background: white;
+  padding: 4px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--dg-text-primary);
+  transition: all 0.2s;
+}
+.dg-page-btn:hover:not(:disabled) {
+  border-color: var(--dg-primary);
+  color: var(--dg-primary);
+}
+.dg-page-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Actions */
+.dg-action-cell-content {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  width: 100%;
+}
+.dg-action-btn {
+  padding: 4px 8px;
+  background: white;
+  border: 1px solid var(--dg-border);
+  border-radius: 4px;
+  color: var(--dg-text-secondary);
+  cursor: pointer;
+  font-size: 12px;
+}
 .dg-action-btn:hover {
-  background: var(--dg-primary);
-  color: white;
   border-color: var(--dg-primary);
-  box-shadow: var(--dg-shadow-sm);
+  color: var(--dg-primary);
 }
-
-.dg-action-btn:active {
-  transform: translateY(1px);
-  box-shadow: none;
-}
-
-.dg-burger-btn {
-  font-size: 18px;
-  font-weight: 700;
-  line-height: 1;
-  padding: 6px 8px;
-}
-
-.dg-burger-btn.active {
-  background: var(--dg-primary);
-  color: white;
-  border-color: var(--dg-primary);
-}
-
-/* Action Menu Container */
 .dg-action-menu-container {
   position: relative;
-  display: inline-flex;
 }
-
-/* Action Dropdown */
 .dg-action-dropdown {
   position: absolute;
-  top: calc(100% + 4px);
+  top: 100%;
   right: 0;
-  background: var(--dg-surface);
+  background: white;
   border: 1px solid var(--dg-border);
-  border-radius: 8px;
+  border-radius: 6px;
   box-shadow: var(--dg-shadow-lg);
-  min-width: 160px;
+  min-width: 140px;
   padding: 4px;
-  z-index: 1001;
-  animation: slideDown 0.2s ease;
+  z-index: 100;
+  margin-top: 4px;
 }
-
-@keyframes slideDown {
-  from {
-    opacity: 0;
-    transform: translateY(-8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
 .dg-dropdown-item {
+  padding: 8px 10px;
+  font-size: 13px;
+  cursor: pointer;
   display: flex;
   align-items: center;
-  padding: 10px 12px;
-  font-size: 14px;
-  color: var(--dg-text-primary);
-  cursor: pointer;
-  border-radius: 6px;
-  transition: background-color 0.15s ease;
-  font-weight: 500;
+  gap: 8px;
+  border-radius: 4px;
 }
-
 .dg-dropdown-item:hover {
   background: var(--dg-surface-hover);
   color: var(--dg-primary);
 }
 
-.dg-dropdown-item:active {
-  background: var(--dg-primary-light);
+/* Pinned Cols Styling */
+.pinned-left {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  border-right: 1px solid #cbd5e1;
 }
-
-/* Focus states for accessibility */
-.dg-action-btn:focus-visible {
-  outline: 2px solid var(--dg-primary);
-  outline-offset: 2px;
+.pinned-right {
+  position: sticky;
+  right: 0;
+  z-index: 2;
+  border-left: 1px solid #cbd5e1;
 }
-
-.dg-header-cell:focus-visible {
-  outline: 2px solid var(--dg-primary);
-  outline-offset: -2px;
+.dg-header-cell.pinned-left,
+.dg-header-cell.pinned-right {
+  z-index: 12;
+  background: var(--dg-surface-alt);
 }
-
-/* Responsive adjustments */
-@media (max-width: 768px) {
-  .dg-header-cell {
-    padding: 10px 12px;
-    font-size: 12px;
-  }
-
-  .dg-cell {
-    padding: 10px 12px;
-    font-size: 13px;
-  }
-
-  .dg-action-btn {
-    padding: 5px 8px;
-    font-size: 13px;
-    min-width: 28px;
-  }
-}
-
-/* Print styles */
-@media print {
-  .dg-container {
-    border: none;
-    box-shadow: none;
-  }
-
-  .dg-action-cell {
-    display: none;
-  }
-
-  .dg-viewport::-webkit-scrollbar {
-    display: none;
-  }
+.dg-cell.pinned-left,
+.dg-cell.pinned-right {
+  background: var(--dg-surface);
 }
