@@ -1,7 +1,7 @@
 /* eslint-disable */
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 
-// --- CSS Styles (Embedded for Single-File Portability) ---
+// --- CSS Styles ---
 const gridStyles = `
 /* DataGrid Component - EssealTable Theme */
 :root {
@@ -36,6 +36,59 @@ const gridStyles = `
   flex-direction: column;
   position: relative;
 }
+
+/* Toolbar */
+.dg-toolbar {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--dg-border);
+  display: flex;
+  justify-content: flex-end;
+  background: var(--dg-surface);
+}
+
+.dg-toolbar-btn {
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--dg-text-secondary);
+  border: 1px solid var(--dg-border);
+  border-radius: 4px;
+  background: white;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s;
+}
+.dg-toolbar-btn:hover { background: var(--dg-surface-hover); color: var(--dg-text-primary); }
+
+/* Column Picker Menu */
+.dg-column-menu {
+  position: absolute;
+  top: 45px;
+  right: 12px;
+  background: white;
+  border: 1px solid var(--dg-border);
+  box-shadow: var(--dg-shadow-md);
+  border-radius: 6px;
+  z-index: 50;
+  width: 200px;
+  max-height: 300px;
+  overflow-y: auto;
+  padding: 6px;
+}
+.dg-column-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  font-size: 13px;
+  color: var(--dg-text-primary);
+  cursor: pointer;
+  border-radius: 4px;
+}
+.dg-column-menu-item:hover { background: var(--dg-surface-hover); }
+.dg-column-menu-item input { cursor: pointer; }
 
 /* Viewport */
 .dg-viewport::-webkit-scrollbar { width: 10px; height: 10px; }
@@ -262,21 +315,21 @@ export interface FilterModel {
   [field: string]: string;
 }
 
-// -- Persistence Types (Updated) --
 export interface TableState {
   page: number;
   sortModel: SortModel | null;
   filterModel: FilterModel;
   expandedGroups: Record<string, boolean>;
-  groupBy: string[];    // New: Stores which columns are grouped
-  rowHeight: number;    // New: Stores density (compact/standard)
+  groupBy: string[];
+  rowHeight: number;
+  columnVisibility: Record<string, boolean>; // New: Column Visibility
 }
 
 export interface DataGridProps<T> {
   rows: T[];
   columns: GridColDef<T>[];
-  groupBy?: (keyof T)[]; // Treated as default/fallback if passed
-  rowHeight?: number;    // Treated as default/fallback if passed
+  groupBy?: (keyof T)[];
+  rowHeight?: number;
   height?: number;
   loading?: boolean;
 
@@ -292,6 +345,7 @@ export interface DataGridProps<T> {
   checkboxSelection?: boolean;
   pagination?: boolean;
   pageSize?: number;
+  disableColumnMenu?: boolean; // New: Option to hide the column picker
 
   // Events
   onSelectionChange?: (selectedIds: (string | number)[]) => void;
@@ -431,13 +485,13 @@ export function EssealTable<T extends { id: string | number }>({
   checkboxSelection = false,
   pagination = false,
   pageSize = 10,
+  disableColumnMenu = false, // Default: false
   onSelectionChange
 }: DataGridProps<T>) {
 
   const [cols, setCols] = useState(initialColumns);
 
   // -- State Initialization --
-  // We prioritize initialState, then fallback to props, then default values.
   const [activeGroupBy, setActiveGroupBy] = useState<string[]>(
     initialState?.groupBy ?? (groupBy as string[]) ?? []
   );
@@ -445,6 +499,16 @@ export function EssealTable<T extends { id: string | number }>({
   const [activeRowHeight, setActiveRowHeight] = useState<number>(
     initialState?.rowHeight ?? rowHeight ?? 40
   );
+
+  // Initialize Visibility based on props.hide OR initialState
+  const [columnVisibility, setColumnVisibility] = useState<Record<string, boolean>>(() => {
+    if (initialState?.columnVisibility) return initialState.columnVisibility;
+    const defaults: Record<string, boolean> = {};
+    initialColumns.forEach(c => {
+      defaults[String(c.field)] = !c.hide;
+    });
+    return defaults;
+  });
 
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>(initialState?.expandedGroups ?? {});
   const [sortModel, setSortModel] = useState<SortModel | null>(initialState?.sortModel ?? null);
@@ -454,6 +518,10 @@ export function EssealTable<T extends { id: string | number }>({
   const [selection, setSelection] = useState<Set<string | number>>(new Set());
   const [scrollTop, setScrollTop] = useState(0);
   const [activeMenuRowId, setActiveMenuRowId] = useState<string | number | null>(null);
+
+  // UI State for Column Picker
+  const [showColumnMenu, setShowColumnMenu] = useState(false);
+  const columnMenuRef = useRef<HTMLDivElement>(null);
 
   // -- Persistence Effect --
   const isFirstRender = useRef(true);
@@ -470,12 +538,13 @@ export function EssealTable<T extends { id: string | number }>({
         sortModel,
         filterModel: filters,
         expandedGroups,
-        groupBy: activeGroupBy,   // Persisting Grouping
-        rowHeight: activeRowHeight // Persisting Density
+        groupBy: activeGroupBy,
+        rowHeight: activeRowHeight,
+        columnVisibility // Persisting Visibility
       };
       onStateChange(currentState);
     }
-  }, [currentPage, sortModel, filters, expandedGroups, activeGroupBy, activeRowHeight, onStateChange]);
+  }, [currentPage, sortModel, filters, expandedGroups, activeGroupBy, activeRowHeight, columnVisibility, onStateChange]);
 
   // Inject Styles
   useEffect(() => {
@@ -487,9 +556,31 @@ export function EssealTable<T extends { id: string | number }>({
     }
   }, []);
 
+  // Handle outside click for Column Menu
+  useEffect(() => {
+    if (!showColumnMenu) return;
+    const handleClick = (e: MouseEvent) => {
+      if (columnMenuRef.current && !columnMenuRef.current.contains(e.target as Node)) {
+        setShowColumnMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [showColumnMenu]);
+
+  // Toggle Visibility Handler
+  const toggleColumn = (field: string) => {
+    setColumnVisibility(prev => ({
+      ...prev,
+      [field]: !prev[field]
+    }));
+  };
+
   // 1. Column Processing
   const { sortedCols, gridTemplateColumns } = useMemo(() => {
-    const visibleCols = cols.filter(c => !c.hide);
+    // Filter based on columnVisibility state instead of just prop
+    const visibleCols = cols.filter(c => columnVisibility[String(c.field)] !== false);
+
     const pinnedLeft = visibleCols.filter(c => c.pinned === 'left');
     const pinnedRight = visibleCols.filter(c => c.pinned === 'right');
     const unpinned = visibleCols.filter(c => !c.pinned);
@@ -511,13 +602,12 @@ export function EssealTable<T extends { id: string | number }>({
 
     const sorted = [...pinnedLeft, ...unpinned, ...pinnedRight];
     return { sortedCols: sorted, gridTemplateColumns: sorted.map(c => `${c.width}px`).join(' ') };
-  }, [cols, rowActions, maxVisibleActions, checkboxSelection]);
+  }, [cols, columnVisibility, rowActions, maxVisibleActions, checkboxSelection]);
 
-  // 2. Data Pipeline (Updated to use activeGroupBy from state)
+  // 2. Data Pipeline
   const processedRows = useMemo(() => {
     let res = filterRows(rows, filters);
     res = sortRows(res, sortModel);
-    // Use activeGroupBy instead of the prop
     const tree = groupRows(res, activeGroupBy as (keyof T)[]);
     return flattenTree(tree, expandedGroups);
   }, [rows, filters, sortModel, activeGroupBy, expandedGroups]);
@@ -530,7 +620,7 @@ export function EssealTable<T extends { id: string | number }>({
   }, [processedRows, pagination, currentPage, pageSize]);
 
   const totalPages = pagination ? Math.ceil(processedRows.length / pageSize) : 1;
-  const totalContentHeight = rowsToRender.length * activeRowHeight; // Use activeRowHeight
+  const totalContentHeight = rowsToRender.length * activeRowHeight;
 
   // Virtualization calculations
   const buffer = 4;
@@ -594,9 +684,35 @@ export function EssealTable<T extends { id: string | number }>({
       {/* Loading Overlay */}
       {loading && <div className="dg-overlay">Loading data...</div>}
 
+      {/* Toolbar - New Feature */}
+      {!disableColumnMenu && (
+        <div className="dg-toolbar">
+          <div style={{ position: 'relative' }}>
+            <button className="dg-toolbar-btn" onClick={() => setShowColumnMenu(!showColumnMenu)}>
+              <span>Columns</span>
+              <span style={{ fontSize: '10px' }}>▼</span>
+            </button>
+            {showColumnMenu && (
+              <div className="dg-column-menu" ref={columnMenuRef}>
+                {cols.map(col => (
+                  <label key={String(col.field)} className="dg-column-menu-item">
+                    <input
+                      type="checkbox"
+                      checked={columnVisibility[String(col.field)] !== false}
+                      onChange={() => toggleColumn(String(col.field))}
+                    />
+                    <span>{col.headerName}</span>
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="dg-viewport"
         onScroll={e => setScrollTop(e.currentTarget.scrollTop)}
-        style={{ overflowY: 'auto', height: pagination ? 'calc(100% - 40px)' : '100%' }}>
+        style={{ overflowY: 'auto', height: pagination ? 'calc(100% - 80px)' : 'calc(100% - 40px)' }}> {/* Adjusted for toolbar height */}
 
         {/* Header */}
         <div className="dg-header-row" style={{ gridTemplateColumns }}>
