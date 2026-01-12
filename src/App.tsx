@@ -158,8 +158,13 @@ export default function App() {
               {['department', 'role'].map((field) => {
                 const isActive = groupBy.includes(field as keyof UserRow);
                 return (
-                  // eslint-disable-next-line
-                  <button key={field} onClick={() => setGroupBy(p => p.includes(field as any) ? [] : [field as any])}
+                  <button key={field} onClick={() => setGroupBy(p =>
+                    // eslint-disable-next-line
+                    p.includes(field as any)
+                      ? p.filter(f => f !== field) // Remove only this field
+                      // eslint-disable-next-line
+                      : [...p, field as any]       // Append this field
+                  )}
                     style={{
                       padding: '4px 10px', borderRadius: '20px', fontSize: '12px', cursor: 'pointer',
                       border: `1px solid ${isActive ? '#0ea5e9' : '#e2e8f0'}`,

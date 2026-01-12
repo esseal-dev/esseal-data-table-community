@@ -43,8 +43,6 @@ export interface TableState {
   sortModel: SortModel | null;
   filterModel: FilterModel;
   expandedGroups: Record<string, boolean>;
-  groupBy: string[];
-  rowHeight: number;
   columnVisibility: Record<string, boolean>;
   pinnedColumns: Record<string, PinDirection>; // New: Pinned Columns State
 }
@@ -232,18 +230,6 @@ export function EssealDataTable<T extends { id: string | number }>({
 
   const [cols, setCols] = useState(initialColumns);
 
-  // @ts-expect-error setActiveGroupBy exists but we don't use it
-  // it is here just for convention purposes
-  const [activeGroupBy, setActiveGroupBy] = useState<string[]>(
-    initialState?.groupBy ?? (groupBy as string[]) ?? []
-  );
-
-  // @ts-expect-error setActiveRowHeight exists but we don't use it
-  // it is here just for convention purposes
-  const [activeRowHeight, setActiveRowHeight] = useState<number>(
-    initialState?.rowHeight ?? rowHeight ?? 40
-  );
-
   const [columnVisibility, setColumnVisibility] = useState<Record<string, boolean>>(() => {
     if (initialState?.columnVisibility) return initialState.columnVisibility;
     const defaults: Record<string, boolean> = {};
@@ -293,14 +279,12 @@ export function EssealDataTable<T extends { id: string | number }>({
         sortModel,
         filterModel: filters,
         expandedGroups,
-        groupBy: activeGroupBy,
-        rowHeight: activeRowHeight,
         columnVisibility,
         pinnedColumns // Persisting Pinned State
       };
       onStateChange(currentState);
     }
-  }, [currentPage, sortModel, filters, expandedGroups, activeGroupBy, activeRowHeight, columnVisibility, pinnedColumns, onStateChange]);
+  }, [currentPage, sortModel, filters, expandedGroups, columnVisibility, pinnedColumns, onStateChange]);
 
   // Click Outside Handlers
   useEffect(() => {
@@ -371,9 +355,9 @@ export function EssealDataTable<T extends { id: string | number }>({
   const processedRows = useMemo(() => {
     let res = filterRows(rows, filters);
     res = sortRows(res, sortModel);
-    const tree = groupRows(res, activeGroupBy as (keyof T)[]);
+    const tree = groupRows(res, groupBy as (keyof T)[]);
     return flattenTree(tree, expandedGroups);
-  }, [rows, filters, sortModel, activeGroupBy, expandedGroups]);
+  }, [rows, filters, sortModel, groupBy, expandedGroups]);
 
   // 3. Pagination & Virtualization
   const rowsToRender = useMemo(() => {
@@ -383,14 +367,14 @@ export function EssealDataTable<T extends { id: string | number }>({
   }, [processedRows, pagination, currentPage, pageSize]);
 
   const totalPages = pagination ? Math.ceil(processedRows.length / pageSize) : 1;
-  const totalContentHeight = rowsToRender.length * activeRowHeight;
+  const totalContentHeight = rowsToRender.length * rowHeight;
 
   // Virtualization calculations
   const buffer = 4;
-  const startIndex = Math.floor(scrollTop / activeRowHeight);
-  const endIndex = Math.min(rowsToRender.length, Math.floor((scrollTop + height) / activeRowHeight) + buffer);
+  const startIndex = Math.floor(scrollTop / rowHeight);
+  const endIndex = Math.min(rowsToRender.length, Math.floor((scrollTop + height) / rowHeight) + buffer);
   const visibleRows = rowsToRender.slice(startIndex, endIndex);
-  const offsetY = startIndex * activeRowHeight;
+  const offsetY = startIndex * rowHeight;
 
   // Handlers
   const toggleGroup = (id: string) => setExpandedGroups(p => ({ ...p, [id]: !p[id] }));
@@ -561,7 +545,7 @@ export function EssealDataTable<T extends { id: string | number }>({
               if (item.type === 'group') {
                 return (
                   <div key={item.id} className="dg-group-row" onClick={() => toggleGroup(item.id)}
-                    style={{ gridColumn: '1 / -1', paddingLeft: `${item.depth * 20 + 12}px`, height: activeRowHeight }}>
+                    style={{ gridColumn: '1 / -1', paddingLeft: `${item.depth * 20 + 12}px`, height: rowHeight }}>
                     <span style={{ marginRight: 8 }}>{expandedGroups[item.id] ? '▼' : '▶'}</span>
                     <span>{String(item.field)}: <strong>{item.value}</strong> ({item.count})</span>
                   </div>
@@ -573,7 +557,7 @@ export function EssealDataTable<T extends { id: string | number }>({
               return (
                 <div key={row.id} className={`dg-row ${isSel ? 'selected' : ''}`}>
                   {sortedCols.map((col, idx) => {
-                    const style = { ...getStickyStyle(idx), height: activeRowHeight };
+                    const style = { ...getStickyStyle(idx), height: rowHeight };
                     if (col.field === '__checkbox') {
                       return <div key={`${row.id}-cb`} className={`dg-cell ${col.pinned || ''}`} style={style}>
                         <input type="checkbox" checked={isSel} onChange={() => handleSelectRow(row.id)} className="dg-checkbox" />
