@@ -23,6 +23,7 @@ export interface GridColDef<T = any> {
 export interface GridAction<T> {
   label: string;
   icon?: React.ReactNode;
+  tooltipText?: string;
   onClick: (row: T) => void;
 }
 
@@ -124,16 +125,28 @@ function ActionCell<T>({ row, actions, maxVisible, isOpen, onToggle, onClose }: 
 
   return (
     <div style={{ display: 'flex', gap: 8, justifyContent: 'center', width: '100%', position: 'relative' }}>
-      {visible.map((a: any, i: number) => (
-        <button key={i} className="dg-action-btn" onClick={(e) => { e.stopPropagation(); a.onClick(row); }}>{a.icon || a.label}</button>
+      {visible.map((a, i: number) => (
+        <button
+          key={i}
+          title={a.tooltipText || a.label}
+          className="dg-action-btn"
+          onClick={(e) => { e.stopPropagation(); a.onClick(row); }}
+        >
+          {a.icon || a.label}
+        </button>
       ))}
       {overflow.length > 0 && (
         <div ref={menuRef}>
           <button className="dg-action-btn" onClick={(e) => { e.stopPropagation(); onToggle(); }}>⋮</button>
           {isOpen && (
             <div className="dg-action-dropdown">
-              {overflow.map((a: any, i: number) => (
-                <div key={i} className="dg-dropdown-item" onClick={(e) => { e.stopPropagation(); a.onClick(row); onClose(); }}>
+              {overflow.map((a, i: number) => (
+                <div
+                  key={i}
+                  title={a.tooltipText || a.label}
+                  className="dg-dropdown-item"
+                  onClick={(e) => { e.stopPropagation(); a.onClick(row); onClose(); }}
+                >
                   {a.icon} {a.label}
                 </div>
               ))}

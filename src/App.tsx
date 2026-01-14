@@ -103,8 +103,8 @@ export default function App() {
   // Actions
   const rowActions = (row: UserRow): GridAction<UserRow>[] => [
     { label: 'Edit', onClick: () => alert(`Edit ${row.name}`) },
-    { label: 'Delete', onClick: () => alert(`Delete ${row.name}`) },
-    { label: 'View Profile', onClick: () => console.log('View', row.id) },
+    { label: 'Delete', onClick: () => alert(`Delete ${row.name}`), icon: '😍' },
+    { label: 'View Profile', onClick: () => console.log('View', row.id), tooltipText: 'testting' },
   ];
 
   // Styles Helper
