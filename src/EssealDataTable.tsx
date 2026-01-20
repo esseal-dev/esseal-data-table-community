@@ -223,7 +223,7 @@ function sortRows<T>(rows: T[], sortModel: SortModel | null): T[] {
 }
 
 // --- Main Component ---
-export function EssealDataTable<T extends { id: string | number }>({
+export default function EssealDataTable<T extends { id: string | number }>({
   rows,
   columns: initialColumns,
   groupBy = [],
