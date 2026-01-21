@@ -1,10 +1,11 @@
 {
   "name": "esseal-data-table",
-  "version": "1.0.1",
+  "version": "1.0.0",
   "type": "module",
   "main": "./dist/esseal-data-table.umd.cjs",
   "module": "./dist/esseal-data-table.js",
   "types": "./dist/index.d.ts",
+  "license": "MIT",
   "files": [
     "dist"
   ],
