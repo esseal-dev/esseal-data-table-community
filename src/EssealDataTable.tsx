@@ -69,6 +69,7 @@ export interface DataGridProps<T> {
   pagination?: boolean;
   pageSize?: number;
   disableColumnMenu?: boolean;
+  toolbar?: React.ReactNode
 
   // Events
   onSelectionChange?: (selectedIds: (string | number)[]) => void;
@@ -238,6 +239,7 @@ export default function EssealDataTable<T extends { id: string | number }>({
   pagination = false,
   pageSize = 10,
   disableColumnMenu = false,
+  toolbar = undefined,
   onSelectionChange
 }: DataGridProps<T>) {
 
@@ -445,8 +447,8 @@ export default function EssealDataTable<T extends { id: string | number }>({
       {loading && <div className="dg-overlay">Loading data...</div>}
 
       {/* Toolbar */}
-      {!disableColumnMenu && (
-        <div className="dg-toolbar">
+      <div className="dg-toolbar">
+        {!disableColumnMenu && (
           <div style={{ position: 'relative' }}>
             <button className="dg-toolbar-btn" onClick={() => setShowColumnMenu(!showColumnMenu)}>
               <span>Columns</span>
@@ -467,8 +469,11 @@ export default function EssealDataTable<T extends { id: string | number }>({
               </div>
             )}
           </div>
+        )}
+        <div id="custom-toolbar-buttons">
+          {toolbar}
         </div>
-      )}
+      </div>
 
       <div className="dg-viewport"
         onScroll={e => setScrollTop(e.currentTarget.scrollTop)}

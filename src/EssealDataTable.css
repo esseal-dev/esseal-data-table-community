@@ -36,7 +36,7 @@
   padding: 8px 12px;
   border-bottom: 1px solid var(--dg-border);
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
   background: var(--dg-surface);
 }
 
