@@ -25,6 +25,7 @@ export interface GridAction<T> {
   icon?: React.ReactNode;
   tooltipText?: string;
   onClick: (row: T) => void;
+  disabled?: boolean
 }
 
 type SortDirection = 'asc' | 'desc';
@@ -132,6 +133,7 @@ function ActionCell<T>({ row, actions, maxVisible, isOpen, onToggle, onClose }: 
           title={a.tooltipText || a.label}
           className="dg-action-btn"
           onClick={(e) => { e.stopPropagation(); a.onClick(row); }}
+          disabled={a.disabled}
         >
           {a.icon || a.label}
         </button>
@@ -146,7 +148,12 @@ function ActionCell<T>({ row, actions, maxVisible, isOpen, onToggle, onClose }: 
                   key={i}
                   title={a.tooltipText || a.label}
                   className="dg-dropdown-item"
-                  onClick={(e) => { e.stopPropagation(); a.onClick(row); onClose(); }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (a.disabled) return
+                    a.onClick(row);
+                    onClose();
+                  }}
                 >
                   {a.icon} {a.label}
                 </div>
