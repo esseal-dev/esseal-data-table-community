@@ -72,7 +72,7 @@
 }
 .dg-column-menu {
   top: 45px;
-  right: 12px;
+  left: 0;
   width: 200px;
   max-height: 300px;
   overflow-y: auto;

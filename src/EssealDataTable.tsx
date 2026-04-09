@@ -26,9 +26,10 @@ const PinIcon = () => (
   </svg>
 );
 
-export default function EssealDataTable<T extends { id: string | number }>({
+export default function EssealDataTable<T>({
   rows,
   columns: initialColumns,
+  getRowId,
   groupBy = [],
   rowHeight = 40,
   height = 600,
@@ -45,7 +46,31 @@ export default function EssealDataTable<T extends { id: string | number }>({
   onSelectionChange,
 }: DataGridProps<T>) {
 
+  const resolveId = useMemo<(row: T) => string | number>(() => {
+    if (getRowId) return getRowId;
+    return (row: T) => {
+      const id = (row as any).id;
+      if (id === undefined || id === null) {
+        throw new Error(
+          '[EssealDataTable] Could not resolve a row ID. ' +
+          'Add an `id` field to your row data or provide the `getRowId` prop.'
+        );
+      }
+      return id;
+    };
+  }, [getRowId]);
+
   const [cols, setCols] = useState<GridColDef<T>[]>(initialColumns);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [containerWidth, setContainerWidth] = useState(0);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(entries => setContainerWidth(entries[0].contentRect.width));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   useEffect(() => {
     setCols(prev =>
@@ -151,18 +176,35 @@ export default function EssealDataTable<T extends { id: string | number }>({
       ...pinnedRight.map(c => attachPin(c, 'right')),
     ];
 
+    // Expand columns to fill available container width, preserving defined widths as minimums
+    const totalDefined = finalCols.reduce((sum, c) => sum + c.width, 0);
+    const extra = containerWidth > 0 && containerWidth > totalDefined
+      ? (containerWidth - totalDefined) / finalCols.length
+      : 0;
+    const expandedCols = extra > 0
+      ? finalCols.map(c => ({ ...c, width: Math.floor(c.width + extra) }))
+      : finalCols;
+
     return {
-      sortedCols: finalCols,
-      gridTemplateColumns: finalCols.map(c => `${c.width}px`).join(' '),
+      sortedCols: expandedCols,
+      gridTemplateColumns: expandedCols.map(c => `${c.width}px`).join(' '),
     };
-  }, [cols, columnVisibility, pinnedColumns, rowActions, maxVisibleActions, checkboxSelection]);
+  }, [cols, columnVisibility, pinnedColumns, rowActions, maxVisibleActions, checkboxSelection, containerWidth]);
+
+  const valueGetters = useMemo(() => {
+    const map: Record<string, (row: T) => any> = {};
+    initialColumns.forEach(col => {
+      if (col.valueGetter) map[String(col.field)] = col.valueGetter;
+    });
+    return map;
+  }, [initialColumns]);
 
   const processedRows = useMemo(() => {
-    let res = filterRows(rows, filters);
-    res = sortRows(res, sortModel);
-    const tree = groupRows(res, groupBy as (keyof T)[]);
+    let res = filterRows(rows, filters, valueGetters);
+    res = sortRows(res, sortModel, valueGetters);
+    const tree = groupRows(res, groupBy as (keyof T)[], valueGetters, resolveId);
     return flattenTree(tree, expandedGroups);
-  }, [rows, filters, sortModel, groupBy, expandedGroups]);
+  }, [rows, filters, sortModel, groupBy, expandedGroups, valueGetters]);
 
   const rowsToRender = useMemo(() => {
     if (!pagination) return processedRows;
@@ -182,7 +224,7 @@ export default function EssealDataTable<T extends { id: string | number }>({
   const toggleGroup = (id: string) => setExpandedGroups(p => ({ ...p, [id]: !p[id] }));
 
   const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newSel = e.target.checked ? new Set(rows.map(r => r.id)) : new Set<string | number>();
+    const newSel = e.target.checked ? new Set(rows.map(r => resolveId(r))) : new Set<string | number>();
     setSelection(newSel);
     onSelectionChange?.(Array.from(newSel));
   };
@@ -215,7 +257,7 @@ export default function EssealDataTable<T extends { id: string | number }>({
   };
 
   return (
-    <div className="dg-container" style={{ height }} role="grid" aria-rowcount={processedRows.length} aria-colcount={sortedCols.length}>
+    <div className="dg-container" style={{ height }} role="grid" aria-rowcount={processedRows.length} aria-colcount={sortedCols.length} ref={containerRef}>
       {loading && <div className="dg-overlay" role="status" aria-live="polite">Loading data...</div>}
 
       <div className="dg-toolbar">
@@ -362,39 +404,41 @@ export default function EssealDataTable<T extends { id: string | number }>({
               }
 
               const row = item.data;
-              const isSel = selection.has(row.id);
+              const rowId = resolveId(row);
+              const isSel = selection.has(rowId);
               return (
-                <div key={row.id} className={`dg-row ${isSel ? 'selected' : ''}`} role="row" aria-selected={checkboxSelection ? isSel : undefined}>
+                <div key={rowId} className={`dg-row ${isSel ? 'selected' : ''}`} role="row" aria-selected={checkboxSelection ? isSel : undefined}>
                   {sortedCols.map((col, idx) => {
                     const style = { ...getStickyStyle(idx), height: rowHeight };
                     if (col.field === '__checkbox') {
                       return (
-                        <div key={`${row.id}-cb`} className={`dg-cell ${col.pinned || ''}`} style={style} role="gridcell">
-                          <input type="checkbox" checked={isSel} onChange={() => handleSelectRow(row.id)} className="dg-checkbox" aria-label="Select row" />
+                        <div key={`${rowId}-cb`} className={`dg-cell ${col.pinned || ''}`} style={style} role="gridcell">
+                          <input type="checkbox" checked={isSel} onChange={() => handleSelectRow(rowId)} className="dg-checkbox" aria-label="Select row" />
                         </div>
                       );
                     }
                     if (col.field === '__actions' && rowActions) {
-                      const isOpen = activeMenuRowId === row.id;
+                      const isOpen = activeMenuRowId === rowId;
                       if (isOpen) style.zIndex = 99;
                       return (
-                        <div key={`${row.id}-act`} className={`dg-cell ${col.pinned || ''}`} style={{ ...style, overflow: 'visible' }} role="gridcell">
+                        <div key={`${rowId}-act`} className={`dg-cell ${col.pinned || ''}`} style={{ ...style, overflow: 'visible' }} role="gridcell">
                           <ActionCell
                             row={row}
                             actions={rowActions(row)}
                             maxVisible={maxVisibleActions}
                             isOpen={isOpen}
-                            onToggle={() => setActiveMenuRowId(isOpen ? null : row.id)}
+                            onToggle={() => setActiveMenuRowId(isOpen ? null : rowId)}
                             onClose={() => setActiveMenuRowId(null)}
                           />
                         </div>
                       );
                     }
+                    const cellValue = col.valueGetter ? col.valueGetter(row) : (row as any)[col.field];
                     return (
-                      <div key={`${row.id}-${String(col.field)}`} className={`dg-cell ${col.pinned ? `pinned-${col.pinned}` : ''}`} style={style} role="gridcell">
+                      <div key={`${rowId}-${String(col.field)}`} className={`dg-cell ${col.pinned ? `pinned-${col.pinned}` : ''}`} style={style} role="gridcell">
                         {col.renderCell
-                          ? col.renderCell({ row, value: (row as any)[col.field], field: String(col.field) })
-                          : (row as any)[col.field]
+                          ? col.renderCell({ row, value: cellValue, field: String(col.field) })
+                          : cellValue
                         }
                       </div>
                     );

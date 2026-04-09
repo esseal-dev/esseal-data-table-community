@@ -14,6 +14,7 @@ export interface GridColDef<T = any> {
   hide?: boolean;
   sortable?: boolean;
   filterable?: boolean;
+  valueGetter?: (row: T) => string | number;
   renderCell?: (params: GridRenderCellParams<T>) => ReactNode;
 }
 
@@ -46,7 +47,7 @@ export interface TableState {
   pinnedColumns: Record<string, PinDirection>;
 }
 
-export interface DataGridProps<T> {
+type DataGridBaseProps<T> = {
   rows: T[];
   columns: GridColDef<T>[];
   groupBy?: (keyof T)[];
@@ -63,7 +64,14 @@ export interface DataGridProps<T> {
   disableColumnMenu?: boolean;
   toolbar?: ReactNode;
   onSelectionChange?: (selectedIds: (string | number)[]) => void;
-}
+};
+
+// If the row type has an `id` field, getRowId is optional.
+// If it doesn't, getRowId is required — enforced at compile time.
+export type DataGridProps<T> = DataGridBaseProps<T> &
+  (T extends { id: string | number }
+    ? { getRowId?: (row: T) => string | number }
+    : { getRowId: (row: T) => string | number });
 
 // Internal node types
 export type GroupNode<T> = {
