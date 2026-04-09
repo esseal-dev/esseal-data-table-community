@@ -1,0 +1,83 @@
+import type { ReactNode } from 'react';
+
+export interface GridRenderCellParams<T = any> {
+  value: any;
+  row: T;
+  field: string;
+}
+
+export interface GridColDef<T = any> {
+  field: keyof T | string;
+  headerName: string;
+  width: number;
+  pinned?: 'left' | 'right' | false;
+  hide?: boolean;
+  sortable?: boolean;
+  filterable?: boolean;
+  renderCell?: (params: GridRenderCellParams<T>) => ReactNode;
+}
+
+export interface GridAction<T> {
+  label: string;
+  icon?: ReactNode;
+  tooltipText?: string;
+  onClick: (row: T) => void;
+  disabled?: boolean;
+}
+
+export type SortDirection = 'asc' | 'desc';
+export type PinDirection = 'left' | 'right' | false;
+
+export interface SortModel {
+  field: string;
+  direction: SortDirection;
+}
+
+export interface FilterModel {
+  [field: string]: string;
+}
+
+export interface TableState {
+  page: number;
+  sortModel: SortModel | null;
+  filterModel: FilterModel;
+  expandedGroups: Record<string, boolean>;
+  columnVisibility: Record<string, boolean>;
+  pinnedColumns: Record<string, PinDirection>;
+}
+
+export interface DataGridProps<T> {
+  rows: T[];
+  columns: GridColDef<T>[];
+  groupBy?: (keyof T)[];
+  rowHeight?: number;
+  height?: number;
+  loading?: boolean;
+  initialState?: Partial<TableState>;
+  onStateChange?: (state: TableState) => void;
+  rowActions?: (row: T) => GridAction<T>[];
+  maxVisibleActions?: number;
+  checkboxSelection?: boolean;
+  pagination?: boolean;
+  pageSize?: number;
+  disableColumnMenu?: boolean;
+  toolbar?: ReactNode;
+  onSelectionChange?: (selectedIds: (string | number)[]) => void;
+}
+
+// Internal node types
+export type GroupNode<T> = {
+  type: 'group';
+  id: string;
+  field: keyof T;
+  value: string;
+  depth: number;
+  count: number;
+  children: (GroupNode<T> | RowNode<T>)[];
+};
+
+export type RowNode<T> = {
+  type: 'row';
+  id: string | number;
+  data: T;
+};
