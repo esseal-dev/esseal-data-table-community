@@ -23,6 +23,7 @@ Built by [Esseal](https://esseal.co.uk).
   - [Row Actions](#row-actions)
   - [State Persistence](#state-persistence)
   - [Custom Toolbar](#custom-toolbar)
+  - [Conditional Row & Cell Styling](#conditional-row--cell-styling)
 - [Styling & Theming](#styling--theming)
 - [TypeScript](#typescript)
 
@@ -102,6 +103,8 @@ export default function App() {
 | State persistence | Save and restore the full table state across sessions |
 | `valueGetter` | Extract display values from nested or computed fields |
 | Custom cell rendering | Render any React node inside a cell |
+| Conditional row styling | Apply a CSS class to any row based on its data |
+| Conditional cell styling | Apply a CSS class to any cell based on its row data, configured per column |
 | Full TypeScript support | Generic component with end-to-end type safety |
 
 ---
@@ -115,7 +118,8 @@ export default function App() {
 | `rows` | `T[]` | — | **Required.** Array of row data. Each object must have an `id: string \| number` field, or you must provide `getRowId`. |
 | `getRowId` | `(row: T) => string \| number` | — | Derives a unique ID from each row. Required when your row data does not have an `id` field. |
 | `columns` | `GridColDef<T>[]` | — | **Required.** Column definitions. |
-| `height` | `number` | `600` | Height of the table in pixels. |
+| `height` | `number \| string` | `'100%'` | Height of the table. Defaults to `'100%'` — fills the parent container. Pass a pixel number (e.g. `600`) or any CSS string (e.g. `'50vh'`) for a fixed height. The parent must have a defined height when using the default. |
+| `getRowClassName` | `(row: T) => string` | — | Returns a CSS class name to apply to the entire row. Use this to conditionally style rows based on their data. See [Conditional Row & Cell Styling](#conditional-row--cell-styling). |
 | `rowHeight` | `number` | `40` | Height of each row in pixels. |
 | `loading` | `boolean` | `false` | Shows a loading overlay over the table. |
 | `pagination` | `boolean` | `false` | Enables pagination controls. |
@@ -145,8 +149,9 @@ interface GridColDef<T> {
   hide?:        boolean;
   sortable?:    boolean;
   filterable?:  boolean;
-  valueGetter?: (row: T) => string | number;
-  renderCell?:  (params: GridRenderCellParams<T>) => ReactNode;
+  valueGetter?:    (row: T) => string | number;
+  renderCell?:     (params: GridRenderCellParams<T>) => ReactNode;
+  cellClassName?:  (row: T) => string;
 }
 ```
 
@@ -161,6 +166,7 @@ interface GridColDef<T> {
 | `filterable` | `boolean` | `true` | Shows a filter input inside the column header. |
 | `valueGetter` | `(row: T) => string \| number` | — | Extracts the cell value from the row. Use this for nested fields or computed values. See [Nested / Computed Values](#nested--computed-values). |
 | `renderCell` | `(params: GridRenderCellParams<T>) => ReactNode` | — | Renders custom React content inside the cell. See [Custom Cell Rendering](#custom-cell-rendering). |
+| `cellClassName` | `(row: T) => string` | — | Returns a CSS class name to apply to this column's cells. Called per row, so the class can vary based on the row's data. See [Conditional Row & Cell Styling](#conditional-row--cell-styling). |
 
 ---
 
@@ -397,6 +403,47 @@ To remove the built-in Columns button and use only your own toolbar content, add
   toolbar={<MyCustomToolbar />}
 />
 ```
+
+### Conditional Row & Cell Styling
+
+Apply CSS classes conditionally based on row data using `getRowClassName` (table prop) and `cellClassName` (column prop).
+
+**Row-level** — highlight an entire row:
+
+```tsx
+<EssealDataTable
+  rows={rows}
+  columns={columns}
+  getRowClassName={(row) => row.status === 'Inactive' ? 'row-inactive' : ''}
+/>
+```
+
+```css
+.row-inactive .dg-cell {
+  background: #fff1f2;
+}
+```
+
+**Cell-level** — highlight individual cells in a specific column:
+
+```tsx
+const columns = [
+  {
+    field: 'status',
+    headerName: 'Status',
+    width: 120,
+    cellClassName: (row) => row.status === 'On Leave' ? 'cell-on-leave' : '',
+  },
+];
+```
+
+```css
+.cell-on-leave {
+  background: #fefce8;
+}
+```
+
+Both props can be used together. `cellClassName` is defined per column, so different columns can apply different classes independently.
 
 ---
 
