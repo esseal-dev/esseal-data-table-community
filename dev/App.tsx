@@ -396,7 +396,6 @@ export default function App() {
               columns={COLUMNS}
               groupBy={groupBy as (keyof Employee)[]}
               rowHeight={rowHeight}
-              height={500}
               loading={loading}
               pagination={pagination}
               pageSize={pageSize}

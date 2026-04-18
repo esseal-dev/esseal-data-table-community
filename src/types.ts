@@ -52,7 +52,7 @@ type DataGridBaseProps<T> = {
   columns: GridColDef<T>[];
   groupBy?: (keyof T)[];
   rowHeight?: number;
-  height?: number;
+  height?: number | string;
   loading?: boolean;
   initialState?: Partial<TableState>;
   onStateChange?: (state: TableState) => void;

@@ -32,7 +32,7 @@ export default function EssealDataTable<T>({
   getRowId,
   groupBy = [],
   rowHeight = 40,
-  height = 600,
+  height = '100%',
   loading = false,
   initialState,
   onStateChange,
@@ -63,11 +63,15 @@ export default function EssealDataTable<T>({
   const [cols, setCols] = useState<GridColDef<T>[]>(initialColumns);
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(0);
+  const [containerHeight, setContainerHeight] = useState(typeof height === 'number' ? height : 0);
 
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
-    const ro = new ResizeObserver(entries => setContainerWidth(entries[0].contentRect.width));
+    const ro = new ResizeObserver(entries => {
+      setContainerWidth(entries[0].contentRect.width);
+      setContainerHeight(entries[0].contentRect.height);
+    });
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
@@ -217,7 +221,7 @@ export default function EssealDataTable<T>({
 
   const buffer = 4;
   const startIndex = Math.floor(scrollTop / rowHeight);
-  const endIndex = Math.min(rowsToRender.length, Math.floor((scrollTop + height) / rowHeight) + buffer);
+  const endIndex = Math.min(rowsToRender.length, Math.floor((scrollTop + containerHeight) / rowHeight) + buffer);
   const visibleRows = rowsToRender.slice(startIndex, endIndex);
   const offsetY = startIndex * rowHeight;
 
