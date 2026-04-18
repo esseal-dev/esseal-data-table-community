@@ -44,6 +44,7 @@ export default function EssealDataTable<T>({
   disableColumnMenu = false,
   toolbar = undefined,
   onSelectionChange,
+  getRowClassName,
 }: DataGridProps<T>) {
 
   const resolveId = useMemo<(row: T) => string | number>(() => {
@@ -410,8 +411,9 @@ export default function EssealDataTable<T>({
               const row = item.data;
               const rowId = resolveId(row);
               const isSel = selection.has(rowId);
+              const extraRowClass = getRowClassName ? getRowClassName(row) : '';
               return (
-                <div key={rowId} className={`dg-row ${isSel ? 'selected' : ''}`} role="row" aria-selected={checkboxSelection ? isSel : undefined}>
+                <div key={rowId} className={`dg-row ${isSel ? 'selected' : ''} ${extraRowClass}`} role="row" aria-selected={checkboxSelection ? isSel : undefined}>
                   {sortedCols.map((col, idx) => {
                     const style = { ...getStickyStyle(idx), height: rowHeight };
                     if (col.field === '__checkbox') {
@@ -438,8 +440,9 @@ export default function EssealDataTable<T>({
                       );
                     }
                     const cellValue = col.valueGetter ? col.valueGetter(row) : (row as any)[col.field];
+                    const extraCellClass = col.cellClassName ? col.cellClassName(row) : '';
                     return (
-                      <div key={`${rowId}-${String(col.field)}`} className={`dg-cell ${col.pinned ? `pinned-${col.pinned}` : ''}`} style={style} role="gridcell">
+                      <div key={`${rowId}-${String(col.field)}`} className={`dg-cell ${col.pinned ? `pinned-${col.pinned}` : ''} ${extraCellClass}`} style={style} role="gridcell">
                         {col.renderCell
                           ? col.renderCell({ row, value: cellValue, field: String(col.field) })
                           : cellValue

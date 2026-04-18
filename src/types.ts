@@ -16,6 +16,7 @@ export interface GridColDef<T = any> {
   filterable?: boolean;
   valueGetter?: (row: T) => string | number;
   renderCell?: (params: GridRenderCellParams<T>) => ReactNode;
+  cellClassName?: (row: T) => string;
 }
 
 export interface GridAction<T> {
@@ -64,6 +65,7 @@ type DataGridBaseProps<T> = {
   disableColumnMenu?: boolean;
   toolbar?: ReactNode;
   onSelectionChange?: (selectedIds: (string | number)[]) => void;
+  getRowClassName?: (row: T) => string;
 };
 
 // If the row type has an `id` field, getRowId is optional.

@@ -118,6 +118,7 @@ const COLUMNS: GridColDef<Employee>[] = [
     headerName: 'Status',
     width: 110,
     sortable: true,
+    cellClassName: (row) => row.status === 'On Leave' ? 'cell-on-leave' : '',
     renderCell: ({ value }) => {
       const s = STATUS_COLORS[value as string] ?? { bg: '#f1f5f9', color: '#64748b' };
       return (
@@ -406,6 +407,7 @@ export default function App() {
               toolbar={customToolbar}
               onStateChange={handleStateChange}
               onSelectionChange={handleSelectionChange}
+              getRowClassName={(row) => row.status === 'Inactive' ? 'row-inactive' : ''}
             />
           </div>
 

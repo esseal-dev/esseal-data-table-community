@@ -217,13 +217,16 @@
   background: var(--dg-selection-bg);
 }
 
+:where(.dg-cell) {
+  background: var(--dg-surface);
+}
+
 .dg-cell {
   padding: 0 12px;
   font-size: 14px;
   color: var(--dg-text-primary);
   border-bottom: 1px solid var(--dg-border-light);
   border-right: 1px solid var(--dg-border-light);
-  background: var(--dg-surface);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -357,7 +360,6 @@
   z-index: 12;
   background: var(--dg-surface-alt);
 }
-.dg-cell.pinned-left,
-.dg-cell.pinned-right {
+:where(.dg-cell.pinned-left, .dg-cell.pinned-right) {
   background: var(--dg-surface);
 }
