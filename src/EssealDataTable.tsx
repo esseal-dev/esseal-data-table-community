@@ -402,7 +402,7 @@ export default function EssealDataTable<T>({
                     onClick={() => toggleGroup(item.id)}
                     style={{ gridColumn: '1 / -1', paddingLeft: `${item.depth * 20 + 12}px`, height: rowHeight }}
                   >
-                    <span style={{ marginRight: 8 }} aria-hidden="true">{expandedGroups[item.id] ? '▼' : '▶'}</span>
+                    <span style={{ marginRight: 8 }} aria-hidden="true">{expandedGroups[item.id] ? '⇣' : '⇢'}</span>
                     <span>{String(item.field)}: <strong>{item.value}</strong> ({item.count})</span>
                   </div>
                 );
