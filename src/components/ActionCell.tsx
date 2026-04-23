@@ -1,4 +1,5 @@
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import type { GridAction } from '../types';
 
 interface ActionCellProps<T> {
@@ -12,14 +13,43 @@ interface ActionCellProps<T> {
 
 export default function ActionCell<T>({ row, actions, maxVisible, isOpen, onToggle, onClose }: ActionCellProps<T>) {
   const menuRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({});
 
   useEffect(() => {
     if (!isOpen) return;
-    const handleClickOutside = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) onClose();
+
+    const updatePosition = () => {
+      if (!triggerRef.current) return;
+      const rect = triggerRef.current.getBoundingClientRect();
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const dropdownHeight = 200;
+
+      if (spaceBelow < dropdownHeight && rect.top > dropdownHeight) {
+        setDropdownStyle({ position: 'fixed', bottom: window.innerHeight - rect.top, right: window.innerWidth - rect.right });
+      } else {
+        setDropdownStyle({ position: 'fixed', top: rect.bottom, right: window.innerWidth - rect.right });
+      }
     };
+
+    updatePosition();
+
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (
+        menuRef.current && !menuRef.current.contains(target) &&
+        triggerRef.current && !triggerRef.current.contains(target)
+      ) onClose();
+    };
+
     document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener('scroll', onClose, true);
+    window.addEventListener('resize', onClose);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('scroll', onClose, true);
+      window.removeEventListener('resize', onClose);
+    };
   }, [isOpen, onClose]);
 
   const visible = actions.slice(0, maxVisible);
@@ -40,8 +70,9 @@ export default function ActionCell<T>({ row, actions, maxVisible, isOpen, onTogg
         </button>
       ))}
       {overflow.length > 0 && (
-        <div ref={menuRef}>
+        <div>
           <button
+            ref={triggerRef}
             className="dg-action-btn"
             aria-label="More actions"
             aria-haspopup="true"
@@ -50,8 +81,8 @@ export default function ActionCell<T>({ row, actions, maxVisible, isOpen, onTogg
           >
             ⋮
           </button>
-          {isOpen && (
-            <div className="dg-action-dropdown" role="menu">
+          {isOpen && createPortal(
+            <div ref={menuRef} className="dg-action-dropdown" role="menu" style={dropdownStyle}>
               {overflow.map((a, i) => (
                 <div
                   key={i}
@@ -69,7 +100,8 @@ export default function ActionCell<T>({ row, actions, maxVisible, isOpen, onTogg
                   {a.icon} {a.label}
                 </div>
               ))}
-            </div>
+            </div>,
+            document.body
           )}
         </div>
       )}

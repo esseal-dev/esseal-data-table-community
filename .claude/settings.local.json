@@ -7,7 +7,8 @@
       "Bash(npm run:*)",
       "Bash(npm pack:*)",
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(npm publish *)"
     ]
   }
 }

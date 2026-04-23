@@ -320,13 +320,10 @@
   cursor: pointer;
 }
 .dg-action-dropdown {
-  position: absolute;
-  top: 100%;
-  right: 0;
   background: white;
   border: 1px solid var(--dg-border);
   box-shadow: var(--dg-shadow-md);
-  z-index: 100;
+  z-index: 9999;
   border-radius: 4px;
   padding: 4px;
   min-width: 120px;
