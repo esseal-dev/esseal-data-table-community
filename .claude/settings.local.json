@@ -8,7 +8,9 @@
       "Bash(npm pack:*)",
       "Bash(git add:*)",
       "Bash(git commit:*)",
-      "Bash(npm publish *)"
+      "Bash(npm publish *)",
+      "Bash(git *)",
+      "Bash(npm view *)"
     ]
   }
 }

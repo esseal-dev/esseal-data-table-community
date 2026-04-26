@@ -7,5 +7,13 @@ export type {
   SortModel,
   FilterModel,
   TableState,
-  DataGridProps
+  DataGridProps,
+  ServerRequestParams,
+  PaginationConfig,
+  GroupingConfig,
+  ServerGroupDef,
+  ServerGroupValue,
+  LoadGroupDataParams,
+  LoadGroupDataResult,
+  LoadMoreNode,
 } from './EssealDataTable';
