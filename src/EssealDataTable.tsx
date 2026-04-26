@@ -1,7 +1,9 @@
 /* eslint-disable */
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import './EssealDataTable.css';
-import type { DataGridProps, GridColDef, PinDirection, SortModel, FilterModel } from './types';
+import type {
+  DataGridProps, GridColDef, PinDirection, SortModel, FilterModel, ServerRequestParams,
+} from './types';
 import ActionCell from './components/ActionCell';
 import { filterRows, sortRows, groupRows, flattenTree } from './utils';
 import { useColumnResize } from './hooks/useColumnResize';
@@ -14,6 +16,14 @@ export type {
   FilterModel,
   TableState,
   DataGridProps,
+  ServerRequestParams,
+  PaginationConfig,
+  GroupingConfig,
+  ServerGroupDef,
+  ServerGroupValue,
+  LoadGroupDataParams,
+  LoadGroupDataResult,
+  LoadMoreNode,
 } from './types';
 
 const ACTION_BTN_WIDTH = 35;
@@ -40,11 +50,19 @@ export default function EssealDataTable<T>({
   maxVisibleActions = 1,
   checkboxSelection = false,
   pagination = false,
-  pageSize = 10,
+  pageSize: pageSizeProp = 10,
   disableColumnMenu = false,
   toolbar = undefined,
   onSelectionChange,
   getRowClassName,
+  // server pagination
+  paginationMode = 'client',
+  rowCount,
+  onServerRequest,
+  filterDebounceMs = 300,
+  // server grouping
+  serverGroups,
+  onLoadGroupData,
 }: DataGridProps<T>) {
 
   const resolveId = useMemo<(row: T) => string | number>(() => {
@@ -60,6 +78,12 @@ export default function EssealDataTable<T>({
       return id;
     };
   }, [getRowId]);
+
+  // ── Page size ──────────────────────────────────────────────────────────────
+  const pageSizeOptions = Array.isArray(pageSizeProp) ? pageSizeProp : null;
+  const [effectivePageSize, setEffectivePageSize] = useState(
+    Array.isArray(pageSizeProp) ? pageSizeProp[0] : pageSizeProp
+  );
 
   const [cols, setCols] = useState<GridColDef<T>[]>(initialColumns);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -112,9 +136,46 @@ export default function EssealDataTable<T>({
   const [activePinMenuCol, setActivePinMenuCol] = useState<string | null>(null);
   const pinMenuRef = useRef<HTMLDivElement>(null);
 
+  // ── Server grouping state ──────────────────────────────────────────────────
+  const [loadedGroupRows, setLoadedGroupRows] = useState<Record<string, T[]>>({});
+  const [groupCursors, setGroupCursors] = useState<Record<string, string>>({});
+  const [groupLoadingState, setGroupLoadingState] = useState<Record<string, 'idle' | 'loading' | 'error'>>({});
+  const [groupHasMore, setGroupHasMore] = useState<Record<string, boolean>>({});
+
+  // Sort indicator — in server mode only advances after loading completes
+  const [committedSortModel, setCommittedSortModel] = useState<SortModel | null>(initialState?.sortModel ?? null);
+
+  // ── Refs ───────────────────────────────────────────────────────────────────
   const onStateChangeRef = useRef(onStateChange);
   useEffect(() => { onStateChangeRef.current = onStateChange; });
 
+  const onServerRequestRef = useRef(onServerRequest);
+  useEffect(() => { onServerRequestRef.current = onServerRequest; });
+
+  const onLoadGroupDataRef = useRef(onLoadGroupData);
+  useEffect(() => { onLoadGroupDataRef.current = onLoadGroupData; });
+
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hasMountFired = useRef(false);
+  const prevLoadingRef = useRef(loading);
+
+  // Stable snapshot of current server params — always fresh inside timer callbacks
+  const serverParamsRef = useRef<ServerRequestParams>({
+    page: initialState?.page ?? 1,
+    pageSize: Array.isArray(pageSizeProp) ? pageSizeProp[0] : pageSizeProp,
+    sortModel: initialState?.sortModel ?? null,
+    filterModel: initialState?.filterModel ?? {},
+    direction: 'first',
+  });
+  serverParamsRef.current = {
+    page: currentPage,
+    pageSize: effectivePageSize,
+    sortModel,
+    filterModel: filters,
+    direction: 'first',
+  };
+
+  // ── onStateChange (existing behavior, unchanged) ───────────────────────────
   const isFirstRender = useRef(true);
   useEffect(() => {
     if (isFirstRender.current) {
@@ -131,9 +192,30 @@ export default function EssealDataTable<T>({
     });
   }, [currentPage, sortModel, filters, expandedGroups, columnVisibility, pinnedColumns]);
 
+  // ── Mount fire for server mode ─────────────────────────────────────────────
   useEffect(() => {
-    setCurrentPage(1);
-  }, [filters]);
+    if (paginationMode !== 'server') return;
+    if (hasMountFired.current) return;
+    hasMountFired.current = true;
+    onServerRequestRef.current?.({ ...serverParamsRef.current, direction: 'first' });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Sort indicator advancement (server mode: wait for loading to finish) ───
+  useEffect(() => {
+    if (paginationMode !== 'server') {
+      setCommittedSortModel(sortModel);
+      return;
+    }
+    if (prevLoadingRef.current === true && loading === false) {
+      setCommittedSortModel(sortModel);
+    }
+    prevLoadingRef.current = loading;
+  }, [loading, sortModel, paginationMode]);
+
+  // ── Debounce cleanup on unmount ────────────────────────────────────────────
+  useEffect(() => () => {
+    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+  }, []);
 
   const { handleMouseDown } = useColumnResize<T>(setCols);
 
@@ -154,6 +236,122 @@ export default function EssealDataTable<T>({
     setActivePinMenuCol(null);
   };
 
+  // ── Event handlers ─────────────────────────────────────────────────────────
+
+  const handleFilterChange = (field: string, value: string) => {
+    const newFilters = { ...serverParamsRef.current.filterModel, [field]: value };
+    setFilters(newFilters);
+    setCurrentPage(1);
+
+    if (paginationMode === 'server') {
+      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = setTimeout(() => {
+        debounceTimerRef.current = null;
+        onServerRequestRef.current?.({
+          page: 1,
+          pageSize: serverParamsRef.current.pageSize,
+          sortModel: serverParamsRef.current.sortModel,
+          filterModel: newFilters,
+          direction: 'first',
+        });
+      }, filterDebounceMs);
+    }
+  };
+
+  const handleSortChange = (field: string) => {
+    const prev = serverParamsRef.current.sortModel;
+    const newSort: SortModel = (prev?.field === field && prev.direction === 'asc')
+      ? { field, direction: 'desc' }
+      : { field, direction: 'asc' };
+
+    setSortModel(newSort);
+
+    if (paginationMode === 'server') {
+      setCurrentPage(1);
+      if (debounceTimerRef.current) { clearTimeout(debounceTimerRef.current); debounceTimerRef.current = null; }
+      onServerRequestRef.current?.({
+        page: 1,
+        pageSize: serverParamsRef.current.pageSize,
+        sortModel: newSort,
+        filterModel: serverParamsRef.current.filterModel,
+        direction: 'first',
+      });
+    }
+  };
+
+  const handlePageChange = (newPage: number) => {
+    const direction = newPage > currentPage ? 'next' : 'prev';
+    setCurrentPage(newPage);
+
+    if (paginationMode === 'server') {
+      if (debounceTimerRef.current) { clearTimeout(debounceTimerRef.current); debounceTimerRef.current = null; }
+      onServerRequestRef.current?.({
+        page: newPage,
+        pageSize: serverParamsRef.current.pageSize,
+        sortModel: serverParamsRef.current.sortModel,
+        filterModel: serverParamsRef.current.filterModel,
+        direction,
+      });
+    }
+  };
+
+  const handlePageSizeChange = (newSize: number) => {
+    setEffectivePageSize(newSize);
+    setCurrentPage(1);
+
+    if (paginationMode === 'server') {
+      if (debounceTimerRef.current) { clearTimeout(debounceTimerRef.current); debounceTimerRef.current = null; }
+      onServerRequestRef.current?.({
+        page: 1,
+        pageSize: newSize,
+        sortModel: serverParamsRef.current.sortModel,
+        filterModel: serverParamsRef.current.filterModel,
+        direction: 'first',
+      });
+    }
+  };
+
+  const handleGroupToggle = async (id: string) => {
+    const isExpanding = !expandedGroups[id];
+    setExpandedGroups(p => ({ ...p, [id]: !p[id] }));
+
+    if (!isExpanding || !serverGroups) return;
+    if (loadedGroupRows[id] !== undefined) return; // already loaded
+
+    setGroupLoadingState(p => ({ ...p, [id]: 'loading' }));
+    try {
+      const result = await onLoadGroupDataRef.current!({
+        groupId: id,
+        currentlyLoaded: 0,
+        cursor: '',
+      });
+      setLoadedGroupRows(p => ({ ...p, [id]: result.rows }));
+      setGroupCursors(p => ({ ...p, [id]: result.nextCursor ?? '' }));
+      setGroupHasMore(p => ({ ...p, [id]: !!result.nextCursor }));
+      setGroupLoadingState(p => ({ ...p, [id]: 'idle' }));
+    } catch {
+      setGroupLoadingState(p => ({ ...p, [id]: 'error' }));
+    }
+  };
+
+  const handleLoadMore = async (groupId: string) => {
+    setGroupLoadingState(p => ({ ...p, [groupId]: 'loading' }));
+    try {
+      const result = await onLoadGroupDataRef.current!({
+        groupId,
+        currentlyLoaded: loadedGroupRows[groupId]?.length ?? 0,
+        cursor: groupCursors[groupId] ?? '',
+      });
+      setLoadedGroupRows(p => ({ ...p, [groupId]: [...(p[groupId] ?? []), ...result.rows] }));
+      setGroupCursors(p => ({ ...p, [groupId]: result.nextCursor ?? '' }));
+      setGroupHasMore(p => ({ ...p, [groupId]: !!result.nextCursor }));
+      setGroupLoadingState(p => ({ ...p, [groupId]: 'idle' }));
+    } catch {
+      setGroupLoadingState(p => ({ ...p, [groupId]: 'error' }));
+    }
+  };
+
+  // ── Column layout ──────────────────────────────────────────────────────────
   const { sortedCols, gridTemplateColumns } = useMemo(() => {
     const visibleCols = cols.filter(c => columnVisibility[String(c.field)] !== false);
     const pinnedLeft = visibleCols.filter(c => pinnedColumns[String(c.field)] === 'left');
@@ -181,7 +379,6 @@ export default function EssealDataTable<T>({
       ...pinnedRight.map(c => attachPin(c, 'right')),
     ];
 
-    // Expand columns to fill available container width, preserving defined widths as minimums
     const totalDefined = finalCols.reduce((sum, c) => sum + c.width, 0);
     const extra = containerWidth > 0 && containerWidth > totalDefined
       ? (containerWidth - totalDefined) / finalCols.length
@@ -204,20 +401,61 @@ export default function EssealDataTable<T>({
     return map;
   }, [initialColumns]);
 
+  // ── Data pipeline ──────────────────────────────────────────────────────────
   const processedRows = useMemo(() => {
-    let res = filterRows(rows, filters, valueGetters);
-    res = sortRows(res, sortModel, valueGetters);
-    const tree = groupRows(res, groupBy as (keyof T)[], valueGetters, resolveId);
+    // Server-side grouping path — build flat list from serverGroups + loaded rows
+    if (serverGroups) {
+      const result: any[] = [];
+      serverGroups.forEach(groupDef => {
+        groupDef.groups.forEach(groupVal => {
+          const groupId = `__${String(groupDef.field)}-${groupVal.value}`;
+          result.push({
+            type: 'group',
+            id: groupId,
+            field: groupDef.field as keyof T,
+            value: groupVal.value,
+            depth: 0,
+            count: groupVal.count,
+            children: [],
+          });
+
+          if (expandedGroups[groupId]) {
+            (loadedGroupRows[groupId] ?? []).forEach(row =>
+              result.push({ type: 'row', id: resolveId(row), data: row })
+            );
+            result.push({
+              type: 'load-more',
+              groupId,
+              state: groupLoadingState[groupId] ?? 'idle',
+            });
+          }
+        });
+      });
+      return result;
+    }
+
+    // Client-side path — skip filter/sort in server pagination mode
+    const source = paginationMode === 'server'
+      ? rows
+      : sortRows(filterRows(rows, filters, valueGetters), sortModel, valueGetters);
+    const tree = groupRows(source, groupBy as (keyof T)[], valueGetters, resolveId);
     return flattenTree(tree, expandedGroups);
-  }, [rows, filters, sortModel, groupBy, expandedGroups, valueGetters]);
+  }, [
+    rows, filters, sortModel, groupBy, serverGroups,
+    expandedGroups, valueGetters, paginationMode, resolveId,
+    loadedGroupRows, groupLoadingState,
+  ]);
 
   const rowsToRender = useMemo(() => {
-    if (!pagination) return processedRows;
-    const start = (currentPage - 1) * pageSize;
-    return processedRows.slice(start, start + pageSize);
-  }, [processedRows, pagination, currentPage, pageSize]);
+    if (!pagination || paginationMode === 'server' || serverGroups) return processedRows;
+    const start = (currentPage - 1) * effectivePageSize;
+    return processedRows.slice(start, start + effectivePageSize);
+  }, [processedRows, pagination, paginationMode, serverGroups, currentPage, effectivePageSize]);
 
-  const totalPages = pagination ? Math.ceil(processedRows.length / pageSize) : 1;
+  const totalPages = pagination
+    ? Math.ceil((paginationMode === 'server' ? (rowCount ?? 0) : processedRows.length) / effectivePageSize)
+    : 1;
+
   const totalContentHeight = rowsToRender.length * rowHeight;
 
   const buffer = 4;
@@ -225,8 +463,6 @@ export default function EssealDataTable<T>({
   const endIndex = Math.min(rowsToRender.length, Math.floor((scrollTop + containerHeight) / rowHeight) + buffer);
   const visibleRows = rowsToRender.slice(startIndex, endIndex);
   const offsetY = startIndex * rowHeight;
-
-  const toggleGroup = (id: string) => setExpandedGroups(p => ({ ...p, [id]: !p[id] }));
 
   const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newSel = e.target.checked ? new Set(rows.map(r => resolveId(r))) : new Set<string | number>();
@@ -257,12 +493,21 @@ export default function EssealDataTable<T>({
   };
 
   const getAriaSort = (field: string): React.AriaAttributes['aria-sort'] => {
-    if (sortModel?.field !== field) return 'none';
-    return sortModel.direction === 'asc' ? 'ascending' : 'descending';
+    if (committedSortModel?.field !== field) return 'none';
+    return committedSortModel.direction === 'asc' ? 'ascending' : 'descending';
   };
 
+  const footerTotal = paginationMode === 'server' ? (rowCount ?? 0) : processedRows.length;
+
   return (
-    <div className="dg-container" style={{ height }} role="grid" aria-rowcount={processedRows.length} aria-colcount={sortedCols.length} ref={containerRef}>
+    <div
+      className="dg-container"
+      style={{ height }}
+      role="grid"
+      aria-rowcount={footerTotal}
+      aria-colcount={sortedCols.length}
+      ref={containerRef}
+    >
       {loading && <div className="dg-overlay" role="status" aria-live="polite">Loading data...</div>}
 
       <div className="dg-toolbar">
@@ -324,21 +569,15 @@ export default function EssealDataTable<T>({
                 <div className="dg-header-main">
                   <div
                     className="dg-header-title"
-                    onClick={() =>
-                      isSortable && setSortModel(p =>
-                        p?.field === col.field && p.direction === 'asc'
-                          ? { field: String(col.field), direction: 'desc' }
-                          : { field: String(col.field), direction: 'asc' }
-                      )
-                    }
+                    onClick={() => isSortable && handleSortChange(String(col.field))}
                   >
                     {col.field === '__checkbox' ? (
                       <input type="checkbox" onChange={handleSelectAll} className="dg-checkbox" aria-label="Select all rows" />
                     ) : (
                       <>
                         <span>{col.headerName}</span>
-                        {sortModel?.field === col.field && (
-                          <span aria-hidden="true">{sortModel.direction === 'asc' ? ' ↑' : ' ↓'}</span>
+                        {committedSortModel?.field === col.field && (
+                          <span aria-hidden="true">{committedSortModel.direction === 'asc' ? ' ↑' : ' ↓'}</span>
                         )}
                       </>
                     )}
@@ -372,7 +611,7 @@ export default function EssealDataTable<T>({
                     aria-label={`Filter by ${col.headerName}`}
                     value={filters[col.field as string] || ''}
                     onClick={e => e.stopPropagation()}
-                    onChange={e => setFilters(p => ({ ...p, [col.field as string]: e.target.value }))}
+                    onChange={e => handleFilterChange(col.field as string, e.target.value)}
                   />
                 )}
                 {!isSystemCol && (
@@ -392,6 +631,34 @@ export default function EssealDataTable<T>({
           )}
           <div className="dg-body" style={{ gridTemplateColumns, transform: `translateY(${offsetY}px)` }}>
             {visibleRows.map(item => {
+              // Load-more / loading / error node
+              if (item.type === 'load-more') {
+                const hasRows = (loadedGroupRows[item.groupId]?.length ?? 0) > 0;
+                return (
+                  <div
+                    key={`load-more-${item.groupId}`}
+                    className="dg-load-more-row"
+                    style={{ gridColumn: '1 / -1', height: rowHeight }}
+                    role="row"
+                  >
+                    {item.state === 'loading' && (
+                      <span className="dg-load-more-spinner" aria-label="Loading">Loading...</span>
+                    )}
+                    {item.state === 'error' && (
+                      <button className="dg-load-more-btn dg-load-more-error" onClick={() => handleLoadMore(item.groupId)}>
+                        Failed to load — Retry
+                      </button>
+                    )}
+                    {item.state === 'idle' && hasRows && groupHasMore[item.groupId] && (
+                      <button className="dg-load-more-btn" onClick={() => handleLoadMore(item.groupId)}>
+                        Load more
+                      </button>
+                    )}
+                  </div>
+                );
+              }
+
+              // Group row
               if (item.type === 'group') {
                 return (
                   <div
@@ -399,7 +666,7 @@ export default function EssealDataTable<T>({
                     className="dg-group-row"
                     role="row"
                     aria-expanded={!!expandedGroups[item.id]}
-                    onClick={() => toggleGroup(item.id)}
+                    onClick={() => handleGroupToggle(item.id)}
                     style={{ gridColumn: '1 / -1', paddingLeft: `${item.depth * 20 + 12}px`, height: rowHeight }}
                   >
                     <span style={{ marginRight: 8 }} aria-hidden="true">{expandedGroups[item.id] ? '⇣' : '⇢'}</span>
@@ -408,6 +675,7 @@ export default function EssealDataTable<T>({
                 );
               }
 
+              // Data row
               const row = item.data;
               const rowId = resolveId(row);
               const isSel = selection.has(rowId);
@@ -457,17 +725,39 @@ export default function EssealDataTable<T>({
         </div>
       </div>
 
-      {pagination && (
-        <div className="dg-footer" role="navigation" aria-label="Pagination">
-          <div>
-            Showing {Math.min(processedRows.length, (currentPage - 1) * pageSize + 1)}–{Math.min(currentPage * pageSize, processedRows.length)} of {processedRows.length}
+      {pagination && (() => {
+        const start = Math.min(footerTotal, (currentPage - 1) * effectivePageSize + 1);
+        const end = paginationMode === 'server'
+          ? Math.min(currentPage * effectivePageSize, rowCount ?? 0)
+          : Math.min(currentPage * effectivePageSize, processedRows.length);
+
+        return (
+          <div className="dg-footer" role="navigation" aria-label="Pagination">
+            <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
+              {checkboxSelection && selection.size > 0 && (
+                <span className="dg-selection-count">{selection.size} selected</span>
+              )}
+              <span>Showing {start}–{end} of {footerTotal}</span>
+              {pageSizeOptions && (
+                <select
+                  className="dg-page-size-select"
+                  value={effectivePageSize}
+                  onChange={e => handlePageSizeChange(Number(e.target.value))}
+                  aria-label="Rows per page"
+                >
+                  {pageSizeOptions.map(size => (
+                    <option key={size} value={size}>{size} / page</option>
+                  ))}
+                </select>
+              )}
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button disabled={currentPage === 1} onClick={() => handlePageChange(currentPage - 1)} className="dg-page-btn" aria-label="Previous page">Prev</button>
+              <button disabled={currentPage >= totalPages} onClick={() => handlePageChange(currentPage + 1)} className="dg-page-btn" aria-label="Next page">Next</button>
+            </div>
           </div>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)} className="dg-page-btn" aria-label="Previous page">Prev</button>
-            <button disabled={currentPage >= totalPages} onClick={() => setCurrentPage(p => p + 1)} className="dg-page-btn" aria-label="Next page">Next</button>
-          </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 }
