@@ -101,6 +101,17 @@ exclusive — passing both is a TypeScript error.
 | `toolbar` | `ReactNode` | No | — | Custom content rendered in the toolbar, to the right of the built-in Columns button. |
 | `disableColumnMenu` | `boolean` | No | `false` | Hides the built-in Columns visibility button. |
 
+### Row expansion
+
+| Name | Type | Required | Default | Description |
+|---|---|---|---|---|
+| `expandable` | `ExpandableConfig<T>` | No | — | Enables row expansion. A chevron column is injected on the left; clicking it toggles an expansion panel below the row. See [`ExpandableConfig<T>`](#expandableconfigT). |
+
+> ⚠️ **Virtualization is disabled while any row is expanded.** All rows in the current
+> page are rendered into the DOM so that expanded panels can take their natural height.
+> For tables with large page sizes, consider keeping expansion panels lightweight or
+> reducing `pageSize` when `expandable` is in use.
+
 ### Styling
 
 | Name | Type | Required | Default | Description |
@@ -200,6 +211,35 @@ rowActions={(row) => [
 
 ---
 
+### `ExpandableConfig<T>`
+
+Passed to the `expandable` prop to enable row expansion.
+
+```ts
+import type { ExpandableConfig } from 'esseal-data-table';
+```
+
+| Property | Type | Required | Description |
+|---|---|---|---|
+| `render` | `(row: T) => ReactNode` | Yes | Called with the full row object when a row is expanded. Return any React content — it renders in a full-width panel below the row with no height constraints from the table. |
+
+```tsx
+<EssealDataTable
+  rows={orders}
+  columns={columns}
+  expandable={{
+    render: (row) => <OrderDetail orderId={row.id} />,
+  }}
+/>
+```
+
+> **Virtualization note:** virtualization is disabled for the entire table while any row
+> is expanded. All rows in the current page are rendered into the DOM so that the
+> expansion panel can take its natural height. Collapse all rows to restore virtualized
+> rendering.
+
+---
+
 ### `TableState`
 
 The complete serialisable state of the table. Returned by `onStateChange` and accepted by
@@ -215,6 +255,7 @@ import type { TableState } from 'esseal-data-table';
 | `sortModel` | `SortModel \| null` | Active sort column and direction, or `null` when unsorted. |
 | `filterModel` | `FilterModel` | Map of `field → filter string` for all column filters. Keys are present even for empty filters. |
 | `expandedGroups` | `Record<string, boolean>` | Map of group ID → expanded state. |
+| `expandedRows` | `(string \| number)[]` | IDs of currently expanded rows. |
 | `columnVisibility` | `Record<string, boolean>` | Map of field name → visibility state. |
 | `pinnedColumns` | `Record<string, 'left' \| 'right' \| false>` | Map of field name → pin direction. |
 
@@ -444,6 +485,10 @@ definition are not clamped — only drag operations are.
 Rows are virtualised by scroll position. Only `floor((containerHeight / rowHeight) + 4)`
 rows are rendered at any time. The `rowHeight` prop must match the actual rendered row
 height for virtualization to be accurate; mismatches cause visual gaps or overlapping rows.
+
+**Virtualization is disabled while any row is expanded** (via `expandable`). All rows on
+the current page are rendered into the DOM so that expansion panels can take their natural
+height. Virtualized rendering resumes automatically once all rows are collapsed.
 
 ### Overflow action menu
 

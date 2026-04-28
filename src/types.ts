@@ -27,6 +27,10 @@ export interface GridAction<T> {
   disabled?: boolean;
 }
 
+export interface ExpandableConfig<T> {
+  render: (row: T) => ReactNode;
+}
+
 export type SortDirection = 'asc' | 'desc';
 export type PinDirection = 'left' | 'right' | false;
 
@@ -44,6 +48,7 @@ export interface TableState {
   sortModel: SortModel | null;
   filterModel: FilterModel;
   expandedGroups: Record<string, boolean>;
+  expandedRows: (string | number)[];
   columnVisibility: Record<string, boolean>;
   pinnedColumns: Record<string, PinDirection>;
 }
@@ -140,6 +145,7 @@ type DataGridBaseProps<T> = {
   toolbar?: ReactNode;
   onSelectionChange?: (selectedIds: (string | number)[]) => void;
   getRowClassName?: (row: T) => string;
+  expandable?: ExpandableConfig<T>;
 } & PaginationConfig & GroupingConfig<T>;
 
 // If the row type has an `id` field, getRowId is optional.

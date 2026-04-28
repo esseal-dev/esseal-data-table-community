@@ -24,6 +24,7 @@ export type {
   LoadGroupDataParams,
   LoadGroupDataResult,
   LoadMoreNode,
+  ExpandableConfig,
 } from './types';
 
 const ACTION_BTN_WIDTH = 35;
@@ -33,6 +34,16 @@ const PinIcon = () => (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <line x1="12" y1="17" x2="12" y2="22"></line>
     <path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"></path>
+  </svg>
+);
+
+const ExpandIcon = ({ expanded }: { expanded: boolean }) => (
+  <svg
+    width="12" height="12" viewBox="0 0 24 24" fill="none"
+    stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+    style={{ transform: expanded ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s', display: 'block' }}
+  >
+    <polyline points="9 18 15 12 9 6" />
   </svg>
 );
 
@@ -55,6 +66,7 @@ export default function EssealDataTable<T>({
   toolbar = undefined,
   onSelectionChange,
   getRowClassName,
+  expandable,
   // server pagination
   paginationMode = 'client',
   rowCount,
@@ -129,6 +141,9 @@ export default function EssealDataTable<T>({
   const [filters, setFilters] = useState<FilterModel>(initialState?.filterModel ?? {});
   const [currentPage, setCurrentPage] = useState(initialState?.page ?? 1);
   const [selection, setSelection] = useState<Set<string | number>>(new Set());
+  const [expandedRows, setExpandedRows] = useState<Set<string | number>>(() =>
+    initialState?.expandedRows ? new Set(initialState.expandedRows) : new Set()
+  );
   const [scrollTop, setScrollTop] = useState(0);
   const [activeMenuRowId, setActiveMenuRowId] = useState<string | number | null>(null);
   const [showColumnMenu, setShowColumnMenu] = useState(false);
@@ -187,10 +202,11 @@ export default function EssealDataTable<T>({
       sortModel,
       filterModel: filters,
       expandedGroups,
+      expandedRows: Array.from(expandedRows),
       columnVisibility,
       pinnedColumns,
     });
-  }, [currentPage, sortModel, filters, expandedGroups, columnVisibility, pinnedColumns]);
+  }, [currentPage, sortModel, filters, expandedGroups, expandedRows, columnVisibility, pinnedColumns]);
 
   // ── Mount fire for server mode ─────────────────────────────────────────────
   useEffect(() => {
@@ -361,6 +377,9 @@ export default function EssealDataTable<T>({
     if (checkboxSelection) {
       pinnedLeft.unshift({ field: '__checkbox', headerName: '', width: 40, pinned: 'left', sortable: false, filterable: false });
     }
+    if (expandable) {
+      pinnedLeft.unshift({ field: '__expand', headerName: '', width: 40, pinned: 'left', sortable: false, filterable: false });
+    }
     if (rowActions) {
       pinnedRight.push({
         field: '__actions',
@@ -457,12 +476,13 @@ export default function EssealDataTable<T>({
     : 1;
 
   const totalContentHeight = rowsToRender.length * rowHeight;
+  const anyRowExpanded = expandedRows.size > 0;
 
   const buffer = 4;
   const startIndex = Math.floor(scrollTop / rowHeight);
   const endIndex = Math.min(rowsToRender.length, Math.floor((scrollTop + containerHeight) / rowHeight) + buffer);
-  const visibleRows = rowsToRender.slice(startIndex, endIndex);
-  const offsetY = startIndex * rowHeight;
+  const visibleRows = anyRowExpanded ? rowsToRender : rowsToRender.slice(startIndex, endIndex);
+  const offsetY = anyRowExpanded ? 0 : startIndex * rowHeight;
 
   const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newSel = e.target.checked ? new Set(rows.map(r => resolveId(r))) : new Set<string | number>();
@@ -475,6 +495,14 @@ export default function EssealDataTable<T>({
     if (newSel.has(id)) newSel.delete(id); else newSel.add(id);
     setSelection(newSel);
     onSelectionChange?.(Array.from(newSel));
+  };
+
+  const handleRowExpand = (rowId: string | number) => {
+    setExpandedRows(prev => {
+      const next = new Set(prev);
+      if (next.has(rowId)) next.delete(rowId); else next.add(rowId);
+      return next;
+    });
   };
 
   const getStickyStyle = (index: number) => {
@@ -554,7 +582,7 @@ export default function EssealDataTable<T>({
               ...getStickyStyle(idx),
               zIndex: isMenuOpen ? 100 : (col.pinned ? 12 : undefined),
             };
-            const isSystemCol = ['__checkbox', '__actions'].includes(String(col.field));
+            const isSystemCol = ['__checkbox', '__actions', '__expand'].includes(String(col.field));
             const isPinned = !!pinnedColumns[String(col.field)];
             const isSortable = col.sortable !== false && !isSystemCol;
 
@@ -623,7 +651,7 @@ export default function EssealDataTable<T>({
         </div>
 
         {/* Body */}
-        <div style={{ height: totalContentHeight, position: 'relative' }}>
+        <div style={{ height: anyRowExpanded ? undefined : totalContentHeight, position: 'relative' }}>
           {processedRows.length === 0 && !loading && (
             <div className="dg-no-rows" role="row">
               <span role="gridcell">No rows found</span>
@@ -670,7 +698,7 @@ export default function EssealDataTable<T>({
                     style={{ gridColumn: '1 / -1', paddingLeft: `${item.depth * 20 + 12}px`, height: rowHeight }}
                   >
                     <span style={{ marginRight: 8 }} aria-hidden="true">{expandedGroups[item.id] ? '⇣' : '⇢'}</span>
-                    <span>{String(item.field)}: <strong>{item.value}</strong> ({item.count})</span>
+                    <span><strong>{item.value}</strong> ({item.count})</span>
                   </div>
                 );
               }
@@ -679,46 +707,68 @@ export default function EssealDataTable<T>({
               const row = item.data;
               const rowId = resolveId(row);
               const isSel = selection.has(rowId);
+              const isExpanded = expandedRows.has(rowId);
               const extraRowClass = getRowClassName ? getRowClassName(row) : '';
               return (
-                <div key={rowId} className={`dg-row ${isSel ? 'selected' : ''} ${extraRowClass}`} role="row" aria-selected={checkboxSelection ? isSel : undefined}>
-                  {sortedCols.map((col, idx) => {
-                    const style = { ...getStickyStyle(idx), height: rowHeight };
-                    if (col.field === '__checkbox') {
+                <React.Fragment key={rowId}>
+                  <div className={`dg-row ${isSel ? 'selected' : ''} ${extraRowClass}`} role="row" aria-selected={checkboxSelection ? isSel : undefined}>
+                    {sortedCols.map((col, idx) => {
+                      const style = { ...getStickyStyle(idx), height: rowHeight };
+                      if (col.field === '__expand') {
+                        return (
+                          <div key={`${rowId}-exp`} className={`dg-cell ${col.pinned || ''}`} style={style} role="gridcell">
+                            <button
+                              className={`dg-expand-btn${isExpanded ? ' expanded' : ''}`}
+                              onClick={() => handleRowExpand(rowId)}
+                              aria-label={isExpanded ? 'Collapse row' : 'Expand row'}
+                              aria-expanded={isExpanded}
+                            >
+                              <ExpandIcon expanded={isExpanded} />
+                            </button>
+                          </div>
+                        );
+                      }
+                      if (col.field === '__checkbox') {
+                        return (
+                          <div key={`${rowId}-cb`} className={`dg-cell ${col.pinned || ''}`} style={style} role="gridcell">
+                            <input type="checkbox" checked={isSel} onChange={() => handleSelectRow(rowId)} className="dg-checkbox" aria-label="Select row" />
+                          </div>
+                        );
+                      }
+                      if (col.field === '__actions' && rowActions) {
+                        const isOpen = activeMenuRowId === rowId;
+                        if (isOpen) style.zIndex = 99;
+                        return (
+                          <div key={`${rowId}-act`} className={`dg-cell ${col.pinned || ''}`} style={{ ...style, overflow: 'visible' }} role="gridcell">
+                            <ActionCell
+                              row={row}
+                              actions={rowActions(row)}
+                              maxVisible={maxVisibleActions}
+                              isOpen={isOpen}
+                              onToggle={() => setActiveMenuRowId(isOpen ? null : rowId)}
+                              onClose={() => setActiveMenuRowId(null)}
+                            />
+                          </div>
+                        );
+                      }
+                      const cellValue = col.valueGetter ? col.valueGetter(row) : (row as any)[col.field];
+                      const extraCellClass = col.cellClassName ? col.cellClassName(row) : '';
                       return (
-                        <div key={`${rowId}-cb`} className={`dg-cell ${col.pinned || ''}`} style={style} role="gridcell">
-                          <input type="checkbox" checked={isSel} onChange={() => handleSelectRow(rowId)} className="dg-checkbox" aria-label="Select row" />
+                        <div key={`${rowId}-${String(col.field)}`} className={`dg-cell ${col.pinned ? `pinned-${col.pinned}` : ''} ${extraCellClass}`} style={style} role="gridcell">
+                          {col.renderCell
+                            ? col.renderCell({ row, value: cellValue, field: String(col.field) })
+                            : cellValue
+                          }
                         </div>
                       );
-                    }
-                    if (col.field === '__actions' && rowActions) {
-                      const isOpen = activeMenuRowId === rowId;
-                      if (isOpen) style.zIndex = 99;
-                      return (
-                        <div key={`${rowId}-act`} className={`dg-cell ${col.pinned || ''}`} style={{ ...style, overflow: 'visible' }} role="gridcell">
-                          <ActionCell
-                            row={row}
-                            actions={rowActions(row)}
-                            maxVisible={maxVisibleActions}
-                            isOpen={isOpen}
-                            onToggle={() => setActiveMenuRowId(isOpen ? null : rowId)}
-                            onClose={() => setActiveMenuRowId(null)}
-                          />
-                        </div>
-                      );
-                    }
-                    const cellValue = col.valueGetter ? col.valueGetter(row) : (row as any)[col.field];
-                    const extraCellClass = col.cellClassName ? col.cellClassName(row) : '';
-                    return (
-                      <div key={`${rowId}-${String(col.field)}`} className={`dg-cell ${col.pinned ? `pinned-${col.pinned}` : ''} ${extraCellClass}`} style={style} role="gridcell">
-                        {col.renderCell
-                          ? col.renderCell({ row, value: cellValue, field: String(col.field) })
-                          : cellValue
-                        }
-                      </div>
-                    );
-                  })}
-                </div>
+                    })}
+                  </div>
+                  {expandable && isExpanded && (
+                    <div className="dg-expanded-row" style={{ gridColumn: '1 / -1' }} role="row">
+                      {expandable.render(row)}
+                    </div>
+                  )}
+                </React.Fragment>
               );
             })}
           </div>

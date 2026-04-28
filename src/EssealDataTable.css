@@ -387,6 +387,33 @@
 
 .dg-load-more-spinner { font-size: 12px; color: var(--dg-text-muted); }
 
+/* ── Row expansion ───────────────────────────────────────────────────────── */
+.dg-expand-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  color: var(--dg-text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, color 0.15s;
+}
+.dg-expand-btn:hover {
+  background: var(--dg-surface-hover);
+  color: var(--dg-text-primary);
+}
+.dg-expand-btn.expanded {
+  color: var(--dg-primary);
+}
+
+.dg-expanded-row {
+  background: var(--dg-surface-alt);
+  border-bottom: 1px solid var(--dg-border);
+  padding: 12px 16px;
+}
+
 /* ── Footer additions ────────────────────────────────────────────────────── */
 .dg-page-size-select {
   font-size: 12px;

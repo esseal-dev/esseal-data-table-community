@@ -91,6 +91,49 @@ function PerformanceBar({ value }: { value: number }) {
   );
 }
 
+function EmployeeDetail({ row }: { row: Employee }) {
+  const s = STATUS_COLORS[row.status] ?? { bg: '#f1f5f9', color: '#64748b' };
+  const perfColor = row.performance >= 85 ? '#16a34a' : row.performance >= 70 ? '#ca8a04' : '#dc2626';
+  const field = (label: string, value: React.ReactNode) => (
+    <div>
+      <div style={{ fontSize: 10, color: '#94a3b8', textTransform: 'uppercase' as const, letterSpacing: '0.05em', marginBottom: 3 }}>{label}</div>
+      <div style={{ fontSize: 13, color: '#0f172a', fontWeight: 500 }}>{value}</div>
+    </div>
+  );
+  return (
+    <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start' }}>
+      <div style={{
+        width: 44, height: 44, borderRadius: '50%', background: '#e0f2fe', color: '#0284c7',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        fontSize: 17, fontWeight: 700, flexShrink: 0,
+      }}>
+        {row.name.charAt(0)}
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, auto)', columnGap: 28, rowGap: 10 }}>
+        {field('Department', row.department.name)}
+        {field('Location', row.location)}
+        {field('Salary', `$${row.salary.toLocaleString()}`)}
+        {field('Joined', row.joined)}
+        {field('Age', row.age)}
+        {field('Status', (
+          <span style={{ padding: '2px 8px', borderRadius: 12, fontSize: 12, background: s.bg, color: s.color, fontWeight: 500 }}>
+            {row.status}
+          </span>
+        ))}
+        <div style={{ gridColumn: 'span 4' }}>
+          <div style={{ fontSize: 10, color: '#94a3b8', textTransform: 'uppercase' as const, letterSpacing: '0.05em', marginBottom: 5 }}>Performance</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ width: 140, background: '#e2e8f0', borderRadius: 4, height: 7, overflow: 'hidden' }}>
+              <div style={{ width: `${row.performance}%`, height: '100%', background: perfColor, borderRadius: 4 }} />
+            </div>
+            <span style={{ fontSize: 13, fontWeight: 600, color: perfColor }}>{row.performance}%</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Column definitions ───────────────────────────────────────────────────────
 
 const COLUMNS: GridColDef<Employee>[] = [
@@ -195,6 +238,7 @@ export default function App() {
   const [groupBy, setGroupBy] = useState<string[]>([]);
   const [disableEdit, setDisableEdit] = useState(false);
   const [showCustomToolbar, setShowCustomToolbar] = useState(true);
+  const [expandableEnabled, setExpandableEnabled] = useState(false);
 
   // Observable state
   const [tableState, setTableState] = useState<TableState | null>(null);
@@ -235,6 +279,10 @@ export default function App() {
       onClick: (r: Employee) => addLog(`Delete: ${r.name} (id=${r.id})`),
     },
   ], [disableEdit, addLog]);
+
+  const expandableConfig = useMemo(() =>
+    expandableEnabled ? { render: (row: Employee) => <EmployeeDetail row={row} /> } : undefined,
+  [expandableEnabled]);
 
   const customToolbar = useMemo(() => showCustomToolbar ? (
     <div style={{ display: 'flex', gap: 6 }}>
@@ -378,10 +426,27 @@ export default function App() {
           <hr style={S.divider} />
 
           <div style={S.section}>
+            <div style={S.sectionHd}>Row Expansion</div>
+
+            <div style={S.row}>
+              <span style={S.label}>Enable expandable</span>
+              <Toggle checked={expandableEnabled} onChange={setExpandableEnabled} />
+            </div>
+            {expandableEnabled && (
+              <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>
+                Click the ▶ chevron on any row
+              </div>
+            )}
+          </div>
+
+          <hr style={S.divider} />
+
+          <div style={S.section}>
             <button style={S.resetBtn} onClick={() => {
               setCheckboxSelection(true); setPagination(true); setPageSize(5);
               setLoading(false); setDisableColumnMenu(false); setMaxVisibleActions(1);
               setRowHeight(40); setGroupBy([]); setDisableEdit(false); setShowCustomToolbar(true);
+              setExpandableEnabled(false);
             }}>
               Reset all to defaults
             </button>
@@ -405,6 +470,7 @@ export default function App() {
               maxVisibleActions={maxVisibleActions}
               rowActions={rowActions}
               toolbar={customToolbar}
+              expandable={expandableConfig}
               onStateChange={handleStateChange}
               onSelectionChange={handleSelectionChange}
               getRowClassName={(row) => row.status === 'Inactive' ? 'row-inactive' : ''}
@@ -433,6 +499,7 @@ export default function App() {
                   <div><b>Filters:</b> {Object.entries(tableState.filterModel).filter(([, v]) => v).map(([k, v]) => `${k}="${v}"`).join(', ') || 'none'}</div>
                   <div><b>Pinned:</b> {Object.entries(tableState.pinnedColumns).filter(([, v]) => v).map(([k, v]) => `${k}=${v}`).join(', ') || 'none'}</div>
                   <div><b>Hidden:</b> {Object.entries(tableState.columnVisibility).filter(([, v]) => !v).map(([k]) => k).join(', ') || 'none'}</div>
+                  <div><b>Expanded rows:</b> {tableState.expandedRows.length > 0 ? tableState.expandedRows.join(', ') : 'none'}</div>
                 </div>
               ) : <span style={{ color: '#94a3b8', fontSize: 12 }}>Interact with the table…</span>}
             </div>

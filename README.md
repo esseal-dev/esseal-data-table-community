@@ -68,7 +68,7 @@ export default function App() {
 
 | Feature | Notes |
 |---|---|
-| Virtualized rendering | Only visible rows render — handles large datasets without lag |
+| Virtualized rendering | Only visible rows render — handles large datasets without lag. Disabled while any row is expanded. |
 | Sorting | Click any header to sort ascending / descending |
 | Per-column filtering | Search inputs built into each column header |
 | Client pagination | Built-in page navigation; supports a page-size selector |
@@ -82,6 +82,7 @@ export default function App() {
 | Row actions | Inline buttons + overflow (`⋮`) menu with portal positioning |
 | Custom toolbar | Inject your own controls into the toolbar |
 | Loading overlay | Block the table while data is in flight |
+| Row expansion | Expand any row to show custom content below it via `expandable.render` |
 | State persistence | Save and restore full table state via `onStateChange` / `initialState` |
 | `valueGetter` | Extract display values from nested or computed fields |
 | Custom cell rendering | Render any React node inside any cell |
