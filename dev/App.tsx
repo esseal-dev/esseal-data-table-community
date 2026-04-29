@@ -282,7 +282,7 @@ export default function App() {
 
   const expandableConfig = useMemo(() =>
     expandableEnabled ? { render: (row: Employee) => <EmployeeDetail row={row} /> } : undefined,
-  [expandableEnabled]);
+    [expandableEnabled]);
 
   const customToolbar = useMemo(() => showCustomToolbar ? (
     <div style={{ display: 'flex', gap: 6 }}>

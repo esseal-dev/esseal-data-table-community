@@ -42,12 +42,16 @@ export function groupRows<T>(
   const currentKey = groupByKeys[0];
   const groups: Record<string, T[]> = {};
   rows.forEach(row => {
-    const value = String(getCellValue(row, String(currentKey), valueGetters));
+    const raw = getCellValue(row, String(currentKey), valueGetters);
+    const value = (raw === null || raw === undefined || raw === '') ? 'Ungrouped' : String(raw);
     if (!groups[value]) groups[value] = [];
     groups[value].push(row);
   });
 
-  return Object.keys(groups).map(groupValue => ({
+  const keys = Object.keys(groups).filter(k => k !== 'Ungrouped');
+  if (groups['Ungrouped']) keys.push('Ungrouped');
+
+  return keys.map(groupValue => ({
     type: 'group',
     id: `${parentId}__${String(currentKey)}-${groupValue}`,
     field: currentKey,

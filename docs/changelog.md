@@ -5,6 +5,33 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [2.5.1] — 2026-04-28
+
+### Fixed
+- Group labels now render in title case with spaces: `in_progress` → `In Progress`,
+  `on-leave` → `On Leave`. Underscores and hyphens are treated as word separators.
+- Rows with a `null`, `undefined`, or empty value for the group field are collected into
+  an `Ungrouped` group, always placed at the end of the group list.
+
+---
+
+## [2.5.0] — 2026-04-28
+
+### Added
+- **Row expansion.** New `expandable` prop accepts `{ render: (row: T) => ReactNode }`.
+  A chevron column is injected on the left; clicking it expands a full-width panel below
+  the row that renders whatever the caller returns. Expanded row IDs are included in
+  `TableState` (`expandedRows`) and can be seeded via `initialState`.
+- **`ExpandableConfig<T>` type** exported for typed usage of the `expandable` prop.
+
+### Changed
+- Virtualization is automatically disabled while any row is expanded so that expansion
+  panels can take their natural height. It resumes once all rows are collapsed.
+- Group row labels no longer show the field key prefix — only the value and count are
+  displayed (e.g. `Engineering (4)` instead of `department: Engineering (4)`).
+
+---
+
 ## [2.3.1] — 2026-04-26
 
 ### Added

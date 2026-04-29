@@ -37,6 +37,11 @@ const PinIcon = () => (
   </svg>
 );
 
+const toTitleCase = (s: string) =>
+  s.replace(/[^_\-\s]+/g, w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+   .replace(/[_\-]/g, ' ')
+   .trim();
+
 const ExpandIcon = ({ expanded }: { expanded: boolean }) => (
   <svg
     width="12" height="12" viewBox="0 0 24 24" fill="none"
@@ -698,7 +703,7 @@ export default function EssealDataTable<T>({
                     style={{ gridColumn: '1 / -1', paddingLeft: `${item.depth * 20 + 12}px`, height: rowHeight }}
                   >
                     <span style={{ marginRight: 8 }} aria-hidden="true">{expandedGroups[item.id] ? '⇣' : '⇢'}</span>
-                    <span><strong>{item.value}</strong> ({item.count})</span>
+                    <span><strong>{toTitleCase(item.value)}</strong> ({item.count})</span>
                   </div>
                 );
               }
