@@ -108,13 +108,13 @@ export default function App() {
 
 | File | Description |
 |---|---|
-| [docs/getting-started.md](https://github.com/esseal-dev/esseal-data-table/blob/main/docs/getting-started.md) | Installation walkthrough and first steps |
-| [docs/api-reference.md](https://github.com/esseal-dev/esseal-data-table/blob/main/docs/api-reference.md) | Every prop, type, and interface |
-| [docs/configuration.md](https://github.com/esseal-dev/esseal-data-table/blob/main/docs/configuration.md) | CSS variables and theming |
-| [docs/examples/](https://github.com/esseal-dev/esseal-data-table/tree/main/docs/examples) | Runnable examples for common patterns |
-| [docs/error-reference.md](https://github.com/esseal-dev/esseal-data-table/blob/main/docs/error-reference.md) | All errors this package can produce |
-| [docs/changelog.md](https://github.com/esseal-dev/esseal-data-table/blob/main/docs/changelog.md) | Version history |
-| [docs/contributing.md](https://github.com/esseal-dev/esseal-data-table/blob/main/docs/contributing.md) | How to run and contribute to the project |
+| [docs/getting-started.md](https://github.com/esseal-dev/esseal-data-table-community/blob/main/docs/getting-started.md) | Installation walkthrough and first steps |
+| [docs/api-reference.md](https://github.com/esseal-dev/esseal-data-table-community/blob/main/docs/api-reference.md) | Every prop, type, and interface |
+| [docs/configuration.md](https://github.com/esseal-dev/esseal-data-table-community/blob/main/docs/configuration.md) | CSS variables and theming |
+| [docs/examples/](https://github.com/esseal-dev/esseal-data-table-community/tree/main/docs/examples) | Runnable examples for common patterns |
+| [docs/error-reference.md](https://github.com/esseal-dev/esseal-data-table-community/blob/main/docs/error-reference.md) | All errors this package can produce |
+| [docs/changelog.md](https://github.com/esseal-dev/esseal-data-table-community/blob/main/docs/changelog.md) | Version history |
+| [docs/contributing.md](https://github.com/esseal-dev/esseal-data-table-community/blob/main/docs/contributing.md) | How to run and contribute to the project |
 
 ---
 
